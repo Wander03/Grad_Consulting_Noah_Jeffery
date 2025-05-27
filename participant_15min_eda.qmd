@@ -53,16 +53,16 @@ full_data <- map_dfr(participant_dirs, read_participant_data) %>%
   mutate(
     participant_number = factor(participant_number, levels = as.character(sort(as.numeric(unique(participant_number))))),
     device_name = case_when(
-      device_name == 'fe:77:90:13:0e:6b' ~ 'device_1',
-      device_name == 'ea:e4:fd:d7:dc:2a' ~ 'device_2',
-      device_name == 'cd:75:20:e1:ef:ef' ~ 'device_3',
+      device_name == 'fe:77:90:13:0e:6b' ~ 'fe',
+      device_name == 'ea:e4:fd:d7:dc:2a' ~ 'ea',
+      device_name == 'cd:75:20:e1:ef:ef' ~ 'cd',
       TRUE ~ NA
       )
     ) %>%
   select(participant_number, device_name, time, chip_time, starts_with('angle')) %>%
   arrange(participant_number)
 
-write.csv(full_data, file = 'combined_15min.csv')
+write.csv(full_data, file = 'combined_15min.csv', row.names = F)
 ```
 
 ```{r}
@@ -81,6 +81,7 @@ summary_df <- full_data %>%
   summarise(
     range_of_motion = max(angle_x) - min(angle_x),
     mean = mean(angle_x),
+    median = median(angle_x),
     iqr = IQR(angle_x),
     .groups = 'keep'
   )
@@ -97,6 +98,13 @@ summary_df %>%
   geom_tile(aes(x = device_name, y = participant_number, fill = mean)) +
   scale_fill_distiller(palette = 'Spectral') +
   labs(title = "Heatmap of Average Angle X by Participant") +
+  theme_bw()
+
+summary_df %>%
+  ggplot() +
+  geom_tile(aes(x = device_name, y = participant_number, fill = median)) +
+  scale_fill_distiller(palette = 'Spectral') +
+  labs(title = "Heatmap of Median Angle X by Participant") +
   theme_bw()
 
 summary_df %>%
@@ -232,7 +240,8 @@ full_data %>%
     plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
   ) +
   labs(title = "Normalized Angle X by Chip Time") +
-  theme_bw()
+  theme_bw() +
+  ylim(-50, 50)
 
 
 full_data %>%
@@ -246,7 +255,8 @@ full_data %>%
     plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
   ) +
   labs(title = "Normalized Angle X by Time") +
-  theme_bw()
+  theme_bw() +
+  ylim(-50, 50)
 
 full_data %>%
   # filter(participant_number %in% seq(1, 5)) %>%
@@ -259,7 +269,53 @@ full_data %>%
     plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
   ) +
   labs(title = "Normalized Angle X by Normalized Chip Time") +
-  theme_bw()
+  theme_bw() +
+  ylim(-50, 50)
+```
+
+```{r}
+full_data %>%
+  # filter(participant_number %in% seq(1, 5)) %>%
+  ggplot() +
+    geom_line(aes(x = chip_time, y = normalized_angle_x, color = participant_number)) +
+    facet_wrap(vars(device_name), nrow = 3, ncol = 1) +
+    theme(
+    strip.text = element_text(size = 8),  # Adjust label size
+    axis.text = element_text(size = 6),   # Adjust axis text size
+    plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
+  ) +
+  labs(title = "Normalized Angle X by Chip Time") +
+  theme_bw() +
+  ylim(-50, 50)
+
+
+full_data %>%
+  # filter(participant_number %in% seq(1, 5)) %>%
+  ggplot() +
+    geom_line(aes(x = time, y = normalized_angle_x, color = participant_number)) +
+    facet_wrap(vars(device_name), nrow = 3, ncol = 1) +
+    theme(
+    strip.text = element_text(size = 8),  # Adjust label size
+    axis.text = element_text(size = 6),   # Adjust axis text size
+    plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
+  ) +
+  labs(title = "Normalized Angle X by Time") +
+  theme_bw() +
+  ylim(-50, 50)
+
+full_data %>%
+  # filter(participant_number %in% seq(1, 5)) %>%
+  ggplot() +
+    geom_line(aes(x = normalized_chip_time, y = normalized_angle_x, color = participant_number)) +
+    facet_wrap(vars(device_name), nrow = 3, ncol = 1) +
+    theme(
+    strip.text = element_text(size = 8),  # Adjust label size
+    axis.text = element_text(size = 6),   # Adjust axis text size
+    plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
+  ) +
+  labs(title = "Normalized Angle X by Normalized Chip Time") +
+  theme_bw() +
+  ylim(-50, 50)
 ```
 
 ```{r}
@@ -284,11 +340,11 @@ full_data %>%
     xlim(-50, 70)
 
 full_data %>%
-  filter(device_name == 'device_1') %>%
+  filter(device_name == 'fe') %>%
   ggplot(aes(x = normalized_angle_x, y = participant_number, fill = ..x..)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
     scale_fill_viridis(name = "angle_x", option = "C") +
-    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Device 1') +
+    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'fe') +
     theme_ipsum() +
       theme(
         legend.position="none",
@@ -298,11 +354,11 @@ full_data %>%
     xlim(-50, 70)
 
 full_data %>%
-  filter(device_name == 'device_2') %>%
+  filter(device_name == 'ea') %>%
   ggplot(aes(x = normalized_angle_x, y = participant_number, fill = ..x..)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
     scale_fill_viridis(name = "angle_x", option = "C") +
-    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Device 2') +
+    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'ea') +
     theme_ipsum() +
       theme(
         legend.position="none",
@@ -312,11 +368,11 @@ full_data %>%
     xlim(-50, 70)
 
 full_data %>%
-  filter(device_name == 'device_3') %>%
+  filter(device_name == 'cd') %>%
   ggplot(aes(x = normalized_angle_x, y = participant_number, fill = ..x..)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
     scale_fill_viridis(name = "angle_x", option = "C") +
-    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Device 3') +
+    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'cd') +
     theme_ipsum() +
       theme(
         legend.position="none",
