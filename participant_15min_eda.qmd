@@ -4,12 +4,15 @@ author: "Andrew Kerr"
 format: html
 editor: source
 embed-resources: true
+code-fold: true
+toc: true
 ---
 
-# Librarys
+# Libraries
 
 ```{r}
 #| message: false
+#| warning: false
 
 library(tidyverse)
 library(here)
@@ -86,21 +89,21 @@ summary_df %>%
   ggplot() +
   geom_tile(aes(x = device_name, y = participant_number, fill = range_of_motion)) +
   scale_fill_distiller(palette = 'Spectral') +
-  labs(title = "Heatmap of Range of Motion") +
+  labs(title = "Heatmap of Range of Motion by Participant") +
   theme_bw()
 
 summary_df %>%
   ggplot() +
   geom_tile(aes(x = device_name, y = participant_number, fill = mean)) +
   scale_fill_distiller(palette = 'Spectral') +
-  labs(title = "Heatmap of Average Angle X") +
+  labs(title = "Heatmap of Average Angle X by Participant") +
   theme_bw()
 
 summary_df %>%
   ggplot() +
   geom_tile(aes(x = device_name, y = participant_number, fill = iqr)) +
   scale_fill_distiller(palette = 'Spectral') +
-  labs(title = "Heatmap of IQR of Angle X") +
+  labs(title = "Heatmap of IQR of Angle X by Participant") +
   theme_bw()
 ```
 
@@ -135,7 +138,7 @@ full_data %>%
   kable()
 ```
 
-## Plots of Angle x over Time
+## Plots of Angle x over Time/Chip Time
 
 ```{r}
 full_data %>%
@@ -156,7 +159,7 @@ full_data %>%
 
 ```{r}
 full_data %>%
-  filter(participant_number %in% seq(1, 5)) %>%
+  filter(participant_number %in% seq(1, 5)) %>% # Look at first 5 participants
   ggplot() +
     geom_line(aes(x = chip_time, y = angle_x)) +
     facet_wrap(vars(participant_number, device_name), nrow = 15, ncol = 3) +
@@ -165,7 +168,9 @@ full_data %>%
     axis.text = element_text(size = 6),   # Adjust axis text size
     plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
   ) +
-  theme_bw()
+  theme_bw() +
+  labs(title = "Angle X by Chip Time by Device",
+       subtitle = "Participants 1-5")
 ```
 
 ## Min-max Normalization of Time
@@ -178,12 +183,12 @@ full_data <- full_data %>%
     time_min_sec = as.numeric(min(chip_time)),
     time_max_sec = as.numeric(max(chip_time)),
     time_range_sec = time_max_sec - time_min_sec,
-    # Standardize chip_time to be between 0 and 1
+    # Normalize chip_time to be between 0 and 1
     normalized_chip_time = (as.numeric(chip_time) - time_min_sec) / time_range_sec
   ) %>%
+  # If two or more normalized_chip_time values have multiple angle_x values, take the average
   group_by(participant_number, device_name, normalized_chip_time) %>%
   mutate(normalized_angle_x = mean(angle_x)) %>%
-  # slice(1) %>%
   select(-c(time_min_sec, time_max_sec, time_range_sec))
 ```
 
@@ -195,14 +200,24 @@ full_data %>%
     ggplot() +
     geom_line(aes(x = time, y = angle_x, color = device_name)) +
   labs(title = "Angle X by Time") +
-  theme_bw()
+  theme_bw() +
+  ylim(-50, 30)
+
+full_data %>%
+  filter(participant_number == 5) %>%
+    ggplot() +
+    geom_line(aes(x = normalized_chip_time, y = angle_x, color = device_name)) +
+  labs(title = "Angle X by Normalized Chip Time") +
+  theme_bw() +
+  ylim(-50, 30)
 
 full_data %>%
   filter(participant_number == 5) %>%
     ggplot() +
     geom_line(aes(x = normalized_chip_time, y = normalized_angle_x, color = device_name)) +
-  labs(title = "Angle X by Normalized Chip Time") +
-  theme_bw()
+  labs(title = "Normalized Angle X by Normalized Chip Time") +
+  theme_bw() +
+  ylim(-50, 30)
 ```
 
 ```{r}
@@ -216,7 +231,7 @@ full_data %>%
     axis.text = element_text(size = 6),   # Adjust axis text size
     plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
   ) +
-  labs(title = "Angle X by Chip Time") +
+  labs(title = "Normalized Angle X by Chip Time") +
   theme_bw()
 
 
@@ -230,7 +245,7 @@ full_data %>%
     axis.text = element_text(size = 6),   # Adjust axis text size
     plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
   ) +
-  labs(title = "Angle X by Time") +
+  labs(title = "Normalized Angle X by Time") +
   theme_bw()
 
 full_data %>%
@@ -243,7 +258,7 @@ full_data %>%
     axis.text = element_text(size = 6),   # Adjust axis text size
     plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
   ) +
-  labs(title = "Angle X by Normalized Chip Time") +
+  labs(title = "Normalized Angle X by Normalized Chip Time") +
   theme_bw()
 ```
 
@@ -259,7 +274,7 @@ full_data %>%
   ggplot(aes(x = normalized_angle_x, y = participant_number, fill = device_name)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
     scale_fill_viridis(name = "angle_x", option = "D", discrete = TRUE) +
-    labs(title = 'Distribution of Time Spent in Angle X by Participant') +
+    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant') +
     theme_ipsum() +
       theme(
         legend.position="none",
@@ -273,7 +288,7 @@ full_data %>%
   ggplot(aes(x = normalized_angle_x, y = participant_number, fill = ..x..)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
     scale_fill_viridis(name = "angle_x", option = "C") +
-    labs(title = 'Distribution of Time Spent in Angle X by Participant', subtitle = 'Device 1') +
+    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Device 1') +
     theme_ipsum() +
       theme(
         legend.position="none",
@@ -287,7 +302,7 @@ full_data %>%
   ggplot(aes(x = normalized_angle_x, y = participant_number, fill = ..x..)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
     scale_fill_viridis(name = "angle_x", option = "C") +
-    labs(title = 'Distribution of Time Spent in Angle X by Participant', subtitle = 'Device 2') +
+    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Device 2') +
     theme_ipsum() +
       theme(
         legend.position="none",
@@ -301,7 +316,7 @@ full_data %>%
   ggplot(aes(x = normalized_angle_x, y = participant_number, fill = ..x..)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
     scale_fill_viridis(name = "angle_x", option = "C") +
-    labs(title = 'Distribution of Time Spent in Angle X by Participant', subtitle = 'Device 3') +
+    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Device 3') +
     theme_ipsum() +
       theme(
         legend.position="none",
