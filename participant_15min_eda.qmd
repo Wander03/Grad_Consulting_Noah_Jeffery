@@ -31,7 +31,7 @@ participant_dirs <- list.dirs(path = here('data', 'Participant#_15min'), full.na
 
 # Function to read-in a single participant's data
 read_participant_data <- function(part_dir) {
-  participant_number <- gsub("Participant|_15min", "", basename(part_dir))
+  participant <- gsub("Participant|_15min", "", basename(part_dir))
   file_path <- file.path(part_dir, "data_0.csv")
 
   if (file.exists(file_path)) {
@@ -40,7 +40,7 @@ read_participant_data <- function(part_dir) {
       mutate(
         quaternions_3 = str_remove(quaternions_3, ","),
         quaternions_3 = as.numeric(quaternions_3),
-        participant_number = participant_number
+        participant = participant
         )
   } else {
     warning(paste("File not found for", basename(part_dir)))
@@ -51,18 +51,18 @@ read_participant_data <- function(part_dir) {
 # Read in each participant and combine the results
 full_data <- map_dfr(participant_dirs, read_participant_data) %>%
   mutate(
-    participant_number = factor(participant_number, levels = as.character(sort(as.numeric(unique(participant_number))))),
-    device_name = case_when(
-      device_name == 'fe:77:90:13:0e:6b' ~ 'fe',
-      device_name == 'ea:e4:fd:d7:dc:2a' ~ 'ea',
-      device_name == 'cd:75:20:e1:ef:ef' ~ 'cd',
+    participant = factor(participant, levels = as.character(sort(as.numeric(unique(participant))))),
+    device_location = case_when(
+      device_name == 'fe:77:90:13:0e:6b' ~ 'neck',
+      device_name == 'ea:e4:fd:d7:dc:2a' ~ 'mid_back',
+      device_name == 'cd:75:20:e1:ef:ef' ~ 'lower_back',
       TRUE ~ NA
       )
     ) %>%
-  select(participant_number, device_name, time, chip_time, starts_with('angle')) %>%
-  arrange(participant_number)
+  select(participant, device_location, time, chip_time, starts_with('angle')) %>%
+  arrange(participant)
 
-write.csv(full_data, file = 'combined_15min.csv', row.names = F)
+write.csv(full_data, file = 'free_15min.csv', row.names = F)
 ```
 
 ```{r}

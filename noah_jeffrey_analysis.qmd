@@ -1,0 +1,480 @@
+---
+title: "Noah Jeffrey Analysis"
+format: html
+editor: visual
+embed-resources: true
+toc: true
+code-fold: true
+---
+
+## Setup
+
+```{r}
+#| warning: false
+#| message: false
+library(tidyverse)
+library(here)
+library(lubridate)
+library(lme4)
+library(nlme)
+library(car)
+library(emmeans)
+```
+
+### Read in Data
+
+```{r}
+#| message: false
+instructed <- read_csv(here("data", "instructed.csv"))
+```
+
+## Aggregating Data by Second
+
+```{r}
+instructed_agg <- instructed %>%
+  mutate(sec = floor(time)) %>%
+  group_by(participant, device_location, posture, sec) %>%
+  summarize(angle_x = mean(angle_x), .groups = "keep")
+```
+
+```{r}
+instructed_agg_nested <- instructed %>%
+  mutate(nested_sec = floor(nested_time)) %>%
+  group_by(participant, device_location, posture, nested_sec) %>%
+  summarize(angle_x = mean(angle_x), .groups = "keep")
+```
+
+## Data Visualizations
+
+```{r}
+xmin <- c(0,10,14,24,27,37,41,51,54,64,67,77,80,90,93,103,106)
+xmax <- lead(xmin,1)
+xmax[17] <- 116
+ymin <- rep(-70,17)
+ymax <- rep(70,17)
+
+
+
+time_ranges <- data.frame(
+  xmin = xmin, 
+  xmax = xmax, 
+  ymin = ymin, 
+  ymax = ymax,
+  posture = c(rep(c("good", "transition", "bad", "transition"), 4), "good")) 
+```
+
+### Unaggregated data
+
+```{r}
+instructed %>%
+  ggplot() +
+  geom_line(aes(x = time, y = angle_x, color = device_location)) +
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = posture), alpha = 0.4, data = time_ranges) +
+  theme_minimal() +
+  facet_wrap(~participant)
+
+```
+
+### Data aggregated by second
+
+```{r}
+instructed_agg %>%
+  ggplot() +
+  geom_line(aes(x = sec, y = angle_x, color = device_location)) +
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = posture), alpha = 0.4, data = time_ranges) +
+  theme_minimal() +
+  facet_wrap(~participant)
+
+```
+
+### Single Participant Plot (aggregated by second)
+
+```{r}
+instructed_agg %>%
+  filter(participant == 1) %>%
+  ggplot() +
+  geom_line(aes(x = sec, y = angle_x, color = device_location)) +
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = posture), alpha = 0.4, data = time_ranges) +
+  theme_minimal()
+```
+
+## Create Dataset for Model
+
+```{r}
+#| message: false
+model_data <- instructed_agg_nested %>% 
+  filter(posture != "transition") %>%
+  group_by(participant, device_location, posture) %>%
+  summarize(angle_x = mean(angle_x, na.rm = TRUE)) %>%
+  ungroup() %>%
+  pivot_wider(id_cols = c(participant, posture), names_from = device_location, values_from = angle_x) %>%
+  mutate(posture = if_else(str_detect(posture, "good"), "good", posture)) %>%
+  ungroup() %>%
+  rename(
+    "lower_back" = 3,
+    "mid_back" = 4,
+    "neck" = 5
+  )
+```
+
+```{r}
+model_data %>%
+  ggplot() +
+  geom_point(aes(x = posture, y = lower_back, color = factor(participant))) +
+  facet_wrap(~participant) +
+  theme(legend.position = "none",
+        plot.title.position = "plot") +
+  labs(title = "Lower Back Sensor") +
+  theme_minimal()
+
+model_data %>%
+  ggplot() +
+  geom_point(aes(x = posture, y = mid_back, color = factor(participant))) +
+  facet_wrap(~participant) +
+  theme(legend.position = "none",
+        plot.title.position = "plot") +
+  labs(title = "Mid Back Sensor") +
+  theme_minimal()
+
+model_data %>%
+  ggplot() +
+  geom_point(aes(x = posture, y = neck, color = factor(participant))) +
+  facet_wrap(~participant) +
+  theme(legend.position = "none",
+        plot.title.position = "plot") +
+  labs(title = "Neck Sensor") +
+  theme_minimal()
+```
+
+## Model Testing
+
+### Lower Back Sensor
+
+#### Regular Mixed Model
+
+```{r}
+model_cd <- lmer(lower_back ~  posture + (1 + posture | participant), data = model_data)
+S(model_cd)
+Anova(model_cd)
+plot(model_cd)
+
+qqnorm(residuals(model_cd))
+qqline(residuals(model_cd))
+
+```
+
+#### Generalized Linear Mixed Model
+
+```{r}
+glmer_cd <- glmer((lower_back + 6) ~  posture + (1 | participant), family = Gamma(link = "identity"), data = model_data)
+S(glmer_cd)
+plot(glmer_cd)
+```
+
+```{r}
+#| code-fold: true
+custom_combos <- data.frame(
+  posture = model_data$posture %>% unique()
+)
+
+custom_preds <- ref_grid(
+  model_cd,
+  data = custom_combos,
+  cov.reduce = FALSE,
+)
+
+model_preds <- emmeans(custom_preds, 
+                         specs = ~ posture,
+                         type = "response"
+                         )
+
+
+model_preds %>% 
+  as_tibble() %>%
+  ggplot(aes(color = posture)) +
+  geom_point(aes(y = posture, x = emmean)) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL)) +
+  geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  theme_minimal() +
+  labs(title = "LMM: Lower Back Sensor") +
+  theme(legend.position = "none",
+        plot.title.position = "plot")
+```
+
+```{r}
+#| code-fold: true
+custom_combos <- data.frame(
+  posture = model_data$posture %>% unique()
+)
+
+custom_preds <- ref_grid(
+  glmer_cd,
+  data = custom_combos,
+  cov.reduce = FALSE,
+)
+
+model_preds <- emmeans(custom_preds, 
+                         specs = ~ posture,
+                         type = "response"
+                         )
+
+
+model_preds %>% 
+  as_tibble() %>%
+  ggplot(aes(color = posture)) +
+  geom_point(aes(y = posture, x = response)) +
+  geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  theme_minimal() +
+  labs(title = "GLMM: Lower Back Sensor") +
+  theme(legend.position = "none",
+        plot.title.position = "plot")
+```
+
+### Mid Back Sensor
+
+```{r}
+model_data %>%
+  select(participant, posture, mid_back) %>%
+  filter(!is.na(mid_back)) %>%
+  select(participant, posture) %>%
+  distinct()
+```
+
+#### Regular Mixed Model
+
+```{r}
+model_ea <- lmer(mid_back ~ posture + (1  | participant), data = model_data)
+S(model_ea)
+Anova(model_ea)
+plot(model_ea)
+
+
+qqnorm(residuals(model_ea))
+qqline(residuals(model_ea))
+```
+
+```{r}
+model_ea <- lmer(mid_back ~ posture + (1  | participant), data = model_data)
+S(model_ea)
+Anova(model_ea)
+plot(model_ea)
+
+
+qqnorm(residuals(model_ea))
+qqline(residuals(model_ea))
+```
+
+#### Generalized Linear Mixed Model
+
+```{r}
+glmer_ea <- glmer((-1*mid_back)+40 ~ posture + (1  | participant), family = Gamma(link = "identity"), data = model_data)
+S(glmer_ea)
+Anova(glmer_ea)
+plot(glmer_ea)
+
+
+glmer_ea <- glmer(mid_back+40 ~ posture + (1  | participant), family = Gamma(link = "identity"), data = model_data)
+S(glmer_ea)
+Anova(glmer_ea)
+plot(glmer_ea)
+```
+
+```{r}
+#| code-fold: true
+custom_preds <- ref_grid(
+  model_ea,
+  data = custom_combos,
+  cov.reduce = FALSE,
+)
+
+model_preds <- emmeans(custom_preds, 
+                         specs = ~ posture,
+                         type = "response"
+                         )
+
+
+model_preds %>% 
+  as_tibble() %>%
+  ggplot(aes(color = posture)) +
+  geom_point(aes(y = posture, x = emmean)) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL)) +
+  geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  theme_minimal() +
+  labs(title = "LMM: Mid Back Sensor") +
+  theme(legend.position = "none",
+        plot.title.position = "plot")
+```
+
+```{r}
+#| code-fold: true
+custom_preds <- ref_grid(
+  glmer_ea,
+  data = custom_combos,
+  cov.reduce = FALSE,
+)
+
+model_preds <- emmeans(custom_preds, 
+                         specs = ~ posture,
+                         type = "response"
+                         )
+
+
+model_preds %>% 
+  as_tibble() %>%
+  mutate(emmean = -1*(emmean-40),
+         asymp.LCL = -1*(asymp.LCL-40),
+         asymp.UCL = -1*(asymp.UCL-40)) %>%
+  ggplot(aes(color = posture)) +
+  geom_point(aes(y = posture, x = emmean)) +
+  geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  theme_minimal() +
+  labs(title = "GLMM: Mid Back Sensor") +
+  theme(legend.position = "none",
+        plot.title.position = "plot")
+```
+
+### Neck Sensor
+
+#### Regular Mixed Model
+
+```{r}
+
+model_fe <- lmer(neck ~ posture + (1 + posture | participant), data = model_data)
+S(model_fe)
+Anova(model_fe)
+plot(model_fe)
+
+
+qqnorm(residuals(model_fe))
+qqline(residuals(model_fe))
+```
+
+#### Generalized Linear Mixed Model
+
+```{r}
+glmer_fe <- glmer((neck*-1)+15 ~ posture + (1 | participant), family = Gamma(link = "identity"), data = model_data)
+S(glmer_fe)
+Anova(glmer_fe)
+plot(glmer_fe)
+```
+
+```{r}
+custom_preds <- ref_grid(
+  model_fe,
+  data = custom_combos,
+  cov.reduce = FALSE,
+)
+
+model_preds <- emmeans(custom_preds, 
+                         specs = ~ posture,
+                         type = "response"
+                         )
+
+
+model_preds %>% 
+  as_tibble() %>%
+  ggplot(aes(color = posture)) +
+  geom_point(aes(y = posture, x = emmean)) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL)) +
+  geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  theme_minimal() +
+  labs(title = "LMM: Neck Sensor") +
+  theme(legend.position = "none",
+        plot.title.position = "plot")
+```
+
+```{r}
+custom_preds <- ref_grid(
+  glmer_fe,
+  data = custom_combos,
+  cov.reduce = FALSE,
+)
+
+model_preds <- emmeans(custom_preds, 
+                         specs = ~ posture,
+                         type = "response"
+                         )
+
+
+model_preds %>% 
+  as_tibble() %>%
+  mutate(response = -1*(response-15),
+       asymp.LCL = -1*(asymp.LCL-15),
+       asymp.UCL = -1*(asymp.UCL-15)) %>%
+  ggplot(aes(color = posture)) +
+  geom_point(aes(y = posture, x = response)) +
+  geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  theme_minimal() +
+  labs(title = "GLMM: Neck Sensor") +
+  theme(legend.position = "none",
+        plot.title.position = "plot")
+```
+
+```{r}
+model_data %>%
+  pivot_longer(cols = lower_back:neck, names_to = "device", values_to = "angle_x") %>%
+  ggplot() +
+  geom_boxplot(aes(y = posture, x = angle_x, color = posture)) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title.position = "plot"
+  ) +
+  geom_vline(aes(xintercept = 0), color = "red", lty = 2) +
+  facet_wrap(~device)
+
+model_data %>%
+  ggplot() +
+  geom_boxplot(aes(y = posture, x = lower_back, color = posture)) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title.position = "plot"
+  ) +
+  geom_vline(aes(xintercept = 0), color = "red", lty = 2) +
+  labs(title = "Device = Lower Back", x = "angle_x")
+
+model_data %>%
+  ggplot() +
+  geom_boxplot(aes(y = posture, x = mid_back, color = posture)) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title.position = "plot"
+  ) +
+  geom_vline(aes(xintercept = 0), color = "red", lty = 2) +
+  labs(title = "Device = Mid Back", x = "angle_x")
+
+
+model_data %>%
+  ggplot() +
+  geom_boxplot(aes(y = posture, x = neck, color = posture)) +
+  geom_point(aes(y = posture, x = neck, color = posture, shape = posture)) + 
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title.position = "plot"
+  ) +
+  geom_vline(aes(xintercept = 0), color = "red", lty = 2) +
+  labs(title = "Device = Neck", x = "angle_x")
+  
+```
+
+```{r}
+library(ggridges)
+
+model_data %>%
+  pivot_longer(cols = lower_back:neck, names_to = "device", values_to = "angle_x") %>%
+  ggplot() +
+  ggridges::geom_density_line(aes(y = posture, x = angle_x, color = posture)) +
+  # geom_boxplot(aes(y = posture, x = angle_x, color = posture)) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  ) +
+  facet_wrap(~device) +
+  geom_vline(aes(xintercept = 0), color = "red", lty = 2)
+```

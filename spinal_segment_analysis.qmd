@@ -1,0 +1,261 @@
+---
+title: "Spinal Segment Analysis"
+author: "Brendan Callender and Andrew Kerr"
+format: html
+editor: source
+embed-resources: true
+code-fold: true
+toc: true
+---
+
+## Set-up
+
+```{r}
+#| warning: false
+#| message: false
+library(tidyverse)
+library(here)
+library(lubridate)
+library(lme4)
+library(nlme)
+library(car)
+library(emmeans)
+library(ggridges)
+library(viridis)
+library(hrbrthemes)
+```
+
+## Data Read-in
+
+```{r}
+#| message: false
+free <- read_csv(here("data", "free_15min.csv")) %>%
+  mutate(
+    participant = factor(
+      participant, 
+      levels = as.character(sort(as.numeric(unique(participant))))
+      )
+  ) %>%
+  select(-angle_y, -angle_z)
+instructed <- read_csv(here("data", "instructed.csv"))
+```
+
+### Data Cleaning
+
+#### Min-max Normalization of Time for 15 Minutes Section
+
+```{r}
+free_norm <- free %>%
+  group_by(participant, device_location) %>%
+  mutate(
+    # Calculate the time range for each group in seconds
+    time_min_sec = as.numeric(min(chip_time)),
+    time_max_sec = as.numeric(max(chip_time)),
+    time_range_sec = time_max_sec - time_min_sec,
+    # Normalize chip_time to be between 0 and 1
+    normalized_chip_time = (as.numeric(chip_time) - time_min_sec) / time_range_sec
+  ) %>%
+  # If two or more normalized_chip_time values have multiple angle_x values, take the average
+  group_by(participant, device_location, normalized_chip_time) %>%
+  mutate(normalized_angle_x = mean(angle_x)) %>%
+  select(-c(time_min_sec, time_max_sec, time_range_sec))
+```
+
+#### Aggregating Data by Second for Instructed Section
+
+```{r}
+instructed_agg <- instructed %>%
+  mutate(sec = floor(time)) %>%
+  group_by(participant, device_location, posture, sec) %>%
+  summarize(angle_x = mean(angle_x), .groups = "keep")
+```
+
+```{r}
+instructed_agg_nested <- instructed %>%
+  mutate(nested_sec = floor(nested_time)) %>%
+  group_by(participant, device_location, posture, nested_sec) %>%
+  summarize(angle_x = mean(angle_x), .groups = "keep")
+```
+
+#### Create Dataset for Modeling
+
+```{r}
+#| message: false
+model_data <- instructed_agg_nested %>% 
+  filter(posture != "transition") %>%
+  group_by(participant, device_location, posture) %>%
+  summarize(angle_x = mean(angle_x, na.rm = TRUE)) %>%
+  ungroup() %>%
+  pivot_wider(id_cols = c(participant, posture), names_from = device_location, values_from = angle_x) %>%
+  mutate(posture = if_else(str_detect(posture, "good"), "good", posture)) %>%
+  ungroup() %>%
+  rename(
+    "lower_back" = 3,
+    "mid_back" = 4,
+    "neck" = 5
+  )
+```
+
+## Data Visualization Settings
+
+```{r}
+xmin <- c(0,10,14,24,27,37,41,51,54,64,67,77,80,90,93,103,106)
+xmax <- lead(xmin,1)
+xmax[17] <- 116
+ymin <- rep(-70,17)
+ymax <- rep(70,17)
+
+time_ranges <- data.frame(
+  xmin = xmin, 
+  xmax = xmax, 
+  ymin = ymin, 
+  ymax = ymax,
+  posture = c(rep(c("good", "transition", "bad", "transition"), 4), "good")) 
+```
+
+## Summary Visualization for 15 Minutes Section
+
+```{r}
+summary_df <- free_norm %>%
+  group_by(participant, device_location) %>%
+  summarise(
+    range_of_motion = max(angle_x) - min(angle_x),
+    mean = mean(angle_x),
+    median = median(angle_x),
+    iqr = IQR(angle_x),
+    .groups = 'keep'
+  )
+
+summary_df %>%
+  ggplot() +
+  geom_tile(aes(x = device_location, y = participant, fill = range_of_motion)) +
+  scale_fill_distiller(palette = 'Spectral') +
+  labs(title = "Heatmap of Range of Motion by Participant") +
+  theme_bw()
+
+summary_df %>%
+  ggplot() +
+  geom_tile(aes(x = device_location, y = participant, fill = mean)) +
+  scale_fill_distiller(palette = 'Spectral') +
+  labs(title = "Heatmap of Average Angle X by Participant") +
+  theme_bw()
+
+summary_df %>%
+  ggplot() +
+  geom_tile(aes(x = device_location, y = participant, fill = median)) +
+  scale_fill_distiller(palette = 'Spectral') +
+  labs(title = "Heatmap of Median Angle X by Participant") +
+  theme_bw()
+
+summary_df %>%
+  ggplot() +
+  geom_tile(aes(x = device_location, y = participant, fill = iqr)) +
+  scale_fill_distiller(palette = 'Spectral') +
+  labs(title = "Heatmap of IQR of Angle X by Participant") +
+  theme_bw()
+```
+
+## Models for Instrcuted Section
+
+### Lower Back Sensor
+
+### Mid Back Sensor
+
+### Neck Sensor
+
+## Visualizations for 15 Minute Section
+
+### All Participants
+
+```{r}
+free_norm %>%
+  # filter(participant_number %in% seq(1, 5)) %>%
+  ggplot() +
+    geom_line(aes(x = normalized_chip_time, y = normalized_angle_x, color = participant)) +
+    facet_wrap(vars(device_location), nrow = 3, ncol = 1) +
+    theme(
+    strip.text = element_text(size = 8),  # Adjust label size
+    axis.text = element_text(size = 6),   # Adjust axis text size
+    plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
+  ) +
+  labs(title = "Normalized Angle X by Normalized Chip Time") +
+  theme_bw()
+
+free_norm %>%
+  # filter(participant_number %in% seq(1, 5)) %>%
+  ggplot() +
+    geom_line(aes(x = normalized_chip_time, y = normalized_angle_x, color = participant)) +
+    facet_wrap(vars(device_location), nrow = 3, ncol = 1) +
+    theme(
+    strip.text = element_text(size = 8),  # Adjust label size
+    axis.text = element_text(size = 6),   # Adjust axis text size
+    plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
+  ) +
+  labs(title = "Normalized Angle X by Normalized Chip Time") +
+  theme_bw() +
+  ylim(-50, 50)
+```
+
+### Ridge Plots
+
+```{r}
+#| message: false
+#| warning: false
+free_norm %>%
+  ggplot(aes(x = normalized_angle_x, y = participant, fill = device_location)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
+    scale_fill_viridis(name = "angle_x", option = "D", discrete = TRUE) +
+    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant') +
+    theme_ipsum() +
+      theme(
+        legend.position="none",
+        panel.spacing = unit(0.1, "lines"),
+        strip.text.x = element_text(size = 8)
+      ) +
+    xlim(-50, 70)
+
+free_norm %>%
+  filter(device_location == 'lower_back') %>%
+  ggplot(aes(x = normalized_angle_x, y = participant, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
+    scale_fill_viridis(name = "angle_x", option = "C") +
+    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Lower Back') +
+    theme_ipsum() +
+      theme(
+        legend.position="none",
+        panel.spacing = unit(0.1, "lines"),
+        strip.text.x = element_text(size = 8)
+      ) +
+    xlim(-50, 70)
+
+free_norm %>%
+  filter(device_location == 'mid_back') %>%
+  ggplot(aes(x = normalized_angle_x, y = participant, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
+    scale_fill_viridis(name = "angle_x", option = "C") +
+    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Mid Back') +
+    theme_ipsum() +
+      theme(
+        legend.position="none",
+        panel.spacing = unit(0.1, "lines"),
+        strip.text.x = element_text(size = 8)
+      ) +
+    xlim(-50, 70)
+
+free_norm %>%
+  filter(device_location == 'neck') %>%
+  ggplot(aes(x = normalized_angle_x, y = participant, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
+    scale_fill_viridis(name = "angle_x", option = "C") +
+    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Neck') +
+    theme_ipsum() +
+      theme(
+        legend.position="none",
+        panel.spacing = unit(0.1, "lines"),
+        strip.text.x = element_text(size = 8)
+      ) +
+    xlim(-50, 70)
+```
+
+
+
