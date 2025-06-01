@@ -42,6 +42,9 @@ free <- read_csv(here("data", "free_15min.csv")) %>%
   ) %>%
   select(-angle_y, -angle_z)
 instructed <- read_csv(here("data", "instructed.csv"))
+
+free_norm_classified <- read_csv(here("data", "free_15min_classified.csv"))
+time_ranges <- read_csv(here("data", "time_ranges_for_plotting.csv"))
 ```
 
 ### Data Cleaning
@@ -295,6 +298,7 @@ free_norm %>%
 
 
 ```{r}
+#| eval: false
 posture_cis <- model_preds_lb %>%
   left_join(model_preds_mb, by = "posture", suffix = c("_lower_back", "_mid_back")) %>%
   left_join(model_preds_n, by = "posture", suffix = c("_lower_back", "_neck")) %>%
@@ -472,7 +476,7 @@ plot_classifications <- function(free_norm_classified, time_ranges, p, loc) {
         panel.grid.minor = element_blank()
       )
   
-  print(proportions)
+  print(proportions %>% arrange(-proportion))
   
   plt  
 
