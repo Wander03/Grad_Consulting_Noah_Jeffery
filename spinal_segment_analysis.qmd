@@ -8,6 +8,10 @@ code-fold: true
 toc: true
 ---
 
+*****************************************************************************************************************************
+NOTE: we are currently using Gamma, so only positive angle values, but we want to take into account negative as well
+*****************************************************************************************************************************
+
 ## Set-up
 
 ```{r}
@@ -157,11 +161,118 @@ summary_df %>%
 
 ## Models for Instrcuted Section
 
-### Lower Back Sensor
+### Lower Back
 
-### Mid Back Sensor
+```{r}
+glmer_cd <- glmer((lower_back + 6) ~  posture + (1 | participant), family = Gamma(link = "identity"), data = model_data)
+S(glmer_cd)
+plot(glmer_cd)
+```
 
-### Neck Sensor
+```{r}
+custom_combos <- data.frame(
+  posture = model_data$posture %>% unique()
+)
+
+custom_preds <- ref_grid(
+  glmer_cd,
+  data = custom_combos,
+  cov.reduce = FALSE,
+)
+
+model_preds_lb <- emmeans(custom_preds, 
+                         specs = ~ posture,
+                         type = "response"
+                         ) %>% 
+  as_tibble()
+
+model_preds_lb  %>%
+  ggplot(aes(color = posture)) +
+  geom_point(aes(y = posture, x = response)) +
+  geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  theme_minimal() +
+  labs(
+    title = "GLMM: Lower Back Sensor",
+    x = "Angle X",
+    y = "Posture"
+    ) +
+  theme(legend.position = "none",
+        plot.title.position = "plot")
+```
+
+### Mid Back
+
+```{r}
+glmer_ea <- glmer(mid_back+40 ~ posture + (1  | participant), family = Gamma(link = "identity"), data = model_data)
+S(glmer_ea)
+Anova(glmer_ea)
+plot(glmer_ea)
+```
+
+```{r}
+custom_preds <- ref_grid(
+  glmer_ea,
+  data = custom_combos,
+  cov.reduce = FALSE,
+)
+
+model_preds_mb <- emmeans(custom_preds, 
+                         specs = ~ posture,
+                         type = "response"
+                         ) %>% 
+  as_tibble()
+
+model_preds_mb %>%
+  mutate(emmean = -1*(emmean-40),
+         asymp.LCL = -1*(asymp.LCL-40),
+         asymp.UCL = -1*(asymp.UCL-40)) %>%
+  ggplot(aes(color = posture)) +
+  geom_point(aes(y = posture, x = emmean)) +
+  geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  theme_minimal() +
+  labs(title = "GLMM: Mid Back Sensor") +
+  theme(legend.position = "none",
+        plot.title.position = "plot")
+```
+
+### Neck
+
+```{r}
+glmer_fe <- glmer((neck*-1)+15 ~ posture + (1 | participant), family = Gamma(link = "identity"), data = model_data)
+S(glmer_fe)
+Anova(glmer_fe)
+plot(glmer_fe)
+```
+
+```{r}
+custom_preds <- ref_grid(
+  glmer_fe,
+  data = custom_combos,
+  cov.reduce = FALSE,
+)
+
+model_preds_n <- emmeans(custom_preds, 
+                         specs = ~ posture,
+                         type = "response"
+                         ) %>% 
+  as_tibble()
+
+
+model_preds_n  %>%
+  mutate(response = -1*(response-15),
+       asymp.LCL = -1*(asymp.LCL-15),
+       asymp.UCL = -1*(asymp.UCL-15)) %>%
+  ggplot(aes(color = posture)) +
+  geom_point(aes(y = posture, x = response)) +
+  geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  theme_minimal() +
+  labs(title = "GLMM: Neck Sensor") +
+  theme(legend.position = "none",
+        plot.title.position = "plot")
+```
 
 ## Visualizations for 15 Minute Section
 
@@ -169,20 +280,6 @@ summary_df %>%
 
 ```{r}
 free_norm %>%
-  # filter(participant_number %in% seq(1, 5)) %>%
-  ggplot() +
-    geom_line(aes(x = normalized_chip_time, y = normalized_angle_x, color = participant)) +
-    facet_wrap(vars(device_location), nrow = 3, ncol = 1) +
-    theme(
-    strip.text = element_text(size = 8),  # Adjust label size
-    axis.text = element_text(size = 6),   # Adjust axis text size
-    plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
-  ) +
-  labs(title = "Normalized Angle X by Normalized Chip Time") +
-  theme_bw()
-
-free_norm %>%
-  # filter(participant_number %in% seq(1, 5)) %>%
   ggplot() +
     geom_line(aes(x = normalized_chip_time, y = normalized_angle_x, color = participant)) +
     facet_wrap(vars(device_location), nrow = 3, ncol = 1) +
@@ -196,30 +293,259 @@ free_norm %>%
   ylim(-50, 50)
 ```
 
+
+```{r}
+posture_cis <- model_preds_lb %>%
+  left_join(model_preds_mb, by = "posture", suffix = c("_lower_back", "_mid_back")) %>%
+  left_join(model_preds_n, by = "posture", suffix = c("_lower_back", "_neck")) %>%
+  rename(
+    response_mid_back = emmean,
+    asymp.LCL_neck = asymp.LCL,
+    asymp.UCL_neck = asymp.UCL
+  ) %>%
+  select(posture, starts_with("response"), starts_with("asymp")) %>%
+  pivot_longer(
+    cols = -posture,
+    names_to = c(".value", "location"),
+    names_pattern = "(asymp\\.[LU]CL)(_.+)$"
+  ) %>%
+  rename(
+    lower = asymp.LCL,
+    upper = asymp.UCL
+  ) %>%
+  filter(!is.na(lower)) %>%
+  mutate(location = gsub("^_", "", location)) %>%
+  arrange(factor(posture, levels = posture_priority))
+
+# Return all matching postures as a list column
+classify_postures <- function(angles, locations, rules) {
+  # Create all possible combinations
+  expand_grid(
+    angle = angles,
+    loc = locations,
+    posture = unique(rules$posture)
+  ) %>%
+  left_join(rules, by = c("loc" = "location", "posture")) %>%
+  mutate(
+    matches = angle >= lower & angle <= upper & !is.na(angle)
+  ) %>%
+  group_by(angle, loc) %>%
+  summarise(
+    postures = if(any(matches)) {
+      paste(sort(unique(posture[matches])), collapse = "+")
+    } else {
+      "unknown"
+    },
+    .groups = "drop"
+  ) %>%
+  right_join(
+    tibble(angle = angles, loc = locations),
+    by = c("angle", "loc")
+  ) %>%
+  mutate(postures = coalesce(postures, "unknown")) %>%
+  pull(postures)
+}
+
+# Apply classification and prepare data for plotting
+free_norm_classified <- free_norm %>%
+  mutate(
+    classified_posture = classify_postures(
+      angles = angle_x,
+      locations = device_location,
+      rules = posture_cis
+    )
+  )
+
+time_ranges <- free_norm_classified %>%
+  group_by(participant, device_location) %>%
+  mutate(
+    posture_change = classified_posture != lag(classified_posture, default = first(classified_posture)),
+    segment_id = cumsum(posture_change)
+  ) %>%
+  group_by(participant, device_location, segment_id, classified_posture) %>%
+  summarise(
+    xmin = min(normalized_chip_time),
+    xmax = max(normalized_chip_time),
+    ymin = min(normalized_angle_x),
+    ymax = max(normalized_angle_x),
+    .groups = "drop"
+  )
+
+# Save data
+write_csv(free_norm_classified, "data/free_15min_classified.csv")
+write_csv(time_ranges, "data/time_ranges_for_plotting.csv")
+```
+
+```{r}
+plot_classifications <- function(free_norm_classified, time_ranges, p, loc) {
+  # Filter data for this participant and location
+  plot_data <- free_norm_classified %>%
+    filter(participant == p, device_location == loc)
+  
+  # Get all unique posture combinations in the data
+  all_postures <- time_ranges %>%
+    filter(participant == p, device_location == loc) %>%
+    pull(classified_posture) %>%
+    unique()
+  
+  # Calculate proportions
+  proportions <- time_ranges %>%
+    filter(participant == p, device_location == loc) %>%
+    mutate(duration = xmax - xmin) %>%
+    group_by(classified_posture) %>%
+    summarise(
+      proportion = sum(duration) / sum(.$duration)
+    )
+  
+  # Base colors for single postures
+  base_colors <- c(
+    "good" = "#009E73",
+    "lumbar slouch" = "#D55E00",
+    "shoulder slouch" = "#0072B2",
+    "neck slouch" = "#CC79A7",
+    "laying back" = "#F0E442",
+    "unknown" = "white"
+  )
+  
+  # Function to generate blend colors for combinations
+  generate_blend <- function(postures, base_colors) {
+    components <- unlist(strsplit(postures, "\\+"))
+    if(length(components) == 1) return(base_colors[postures])
+    
+    # Convert hex to RGB
+    rgb_vals <- col2rgb(base_colors[components])
+    # Average the RGB values
+    blend <- rowMeans(rgb_vals)
+    # Convert back to hex
+    rgb(blend[1], blend[2], blend[3], maxColorValue = 255)
+  }
+  
+  # Create color mapping for all observed postures
+  posture_colors <- sapply(all_postures, generate_blend, base_colors = base_colors)
+  names(posture_colors) <- all_postures
+  
+  # Create label mapping (posture -> label with proportion)
+  posture_labels <- proportions %>%
+    mutate(label = paste0(classified_posture, " (", scales::percent(proportion, accuracy = 1), ")")) %>%
+    select(classified_posture, label)
+  
+  # Create named vector for labels
+  legend_labels <- posture_labels$label
+  names(legend_labels) <- posture_labels$classified_posture
+
+  # Create the plot
+  plt <- time_ranges %>% 
+    filter(participant == p, device_location == loc) %>%
+    ggplot() +
+      geom_rect(
+        aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, 
+            fill = classified_posture),
+        alpha = 0.4,
+        color = NA,
+        inherit.aes = FALSE
+      ) +
+      geom_line(
+        aes(x = normalized_chip_time, y = normalized_angle_x),
+        data = plot_data,
+        color = "black"
+      ) +
+      scale_fill_manual(
+        values = posture_colors,
+        breaks = names(sort(posture_colors)),  # Sort for consistent legend
+        labels = legend_labels,
+        guide = guide_legend(
+          title = "Posture Classification",
+          nrow = 3,
+          override.aes = list(alpha = 0.6)
+        )
+      ) +
+      labs(
+        x = "Normalized Time",
+        y = "Normalized Angle",
+        title = paste("Participant", p, "-", loc)
+      ) +
+      theme_minimal() +
+      theme(
+        legend.position = "bottom",
+        legend.box = "vertical",
+        panel.grid.major = element_line(color = "grey90"),
+        panel.grid.minor = element_blank()
+      )
+  
+  print(proportions)
+  
+  plt  
+
+}
+```
+
+#### Lower Back
+
+```{r}
+plot_classifications(free_norm_classified, time_ranges, 5, "lower_back")
+```
+
+#### Lower Back
+
+```{r}
+plot_classifications(free_norm_classified, time_ranges, 5, "mid_back")
+```
+
+#### Lower Back
+
+```{r}
+plot_classifications(free_norm_classified, time_ranges, 5, "neck")
+```
+
 ### Ridge Plots
+
+#### All Devices
 
 ```{r}
 #| message: false
 #| warning: false
 free_norm %>%
-  ggplot(aes(x = normalized_angle_x, y = participant, fill = device_location)) +
+  ggplot(aes(x = angle_x, y = participant, fill = device_location)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
-    scale_fill_viridis(name = "angle_x", option = "D", discrete = TRUE) +
-    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant') +
+    scale_fill_viridis(
+      option = "D", 
+      discrete = TRUE,
+      labels = c(
+        "lower_back" = "Lower Back",
+        "mid_back" = "Mid Back",
+        "neck" = "Neck"
+        )
+      ) +
+    labs(
+      title = 'Distribution of Time Spent in Normalized Angle X by Participant',
+      fill = 'Device Type',
+      x = 'Angle X',
+      y = 'Participant'
+      ) +
     theme_ipsum() +
       theme(
-        legend.position="none",
         panel.spacing = unit(0.1, "lines"),
         strip.text.x = element_text(size = 8)
       ) +
     xlim(-50, 70)
+```
 
+#### Lower Back
+
+```{r}
+#| message: false
+#| warning: false
 free_norm %>%
   filter(device_location == 'lower_back') %>%
-  ggplot(aes(x = normalized_angle_x, y = participant, fill = ..x..)) +
+  ggplot(aes(x = angle_x, y = participant, fill = ..x..)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
-    scale_fill_viridis(name = "angle_x", option = "C") +
-    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Lower Back') +
+    scale_fill_viridis(option = "C") +
+    labs(
+      title = 'Distribution of Time Spent in Normalized Angle X by Participant', 
+      subtitle = 'Lower Back',
+      x = 'Angle X',
+      y = 'Participant'
+      ) +
     theme_ipsum() +
       theme(
         legend.position="none",
@@ -227,13 +553,24 @@ free_norm %>%
         strip.text.x = element_text(size = 8)
       ) +
     xlim(-50, 70)
+```
 
+#### Mid Back
+
+```{r}
+#| message: false
+#| warning: false
 free_norm %>%
   filter(device_location == 'mid_back') %>%
-  ggplot(aes(x = normalized_angle_x, y = participant, fill = ..x..)) +
+  ggplot(aes(x = angle_x, y = participant, fill = ..x..)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
-    scale_fill_viridis(name = "angle_x", option = "C") +
-    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Mid Back') +
+    scale_fill_viridis(option = "C") +
+    labs(
+      title = 'Distribution of Time Spent in Normalized Angle X by Participant', 
+      subtitle = 'Mid Back',
+      x = 'Angle X',
+      y = 'Participant'
+      ) +
     theme_ipsum() +
       theme(
         legend.position="none",
@@ -241,13 +578,24 @@ free_norm %>%
         strip.text.x = element_text(size = 8)
       ) +
     xlim(-50, 70)
+```
 
+#### Neck
+
+```{r}
+#| message: false
+#| warning: false
 free_norm %>%
   filter(device_location == 'neck') %>%
-  ggplot(aes(x = normalized_angle_x, y = participant, fill = ..x..)) +
+  ggplot(aes(x = angle_x, y = participant, fill = ..x..)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
-    scale_fill_viridis(name = "angle_x", option = "C") +
-    labs(title = 'Distribution of Time Spent in Normalized Angle X by Participant', subtitle = 'Neck') +
+    scale_fill_viridis(option = "C") +
+    labs(
+      title = 'Distribution of Time Spent in Normalized Angle X by Participant', 
+      subtitle = 'Neck',
+      x = 'Angle X',
+      y = 'Participant'
+      ) +
     theme_ipsum() +
       theme(
         legend.position="none",
