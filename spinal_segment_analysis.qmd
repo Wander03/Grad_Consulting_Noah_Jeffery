@@ -9,7 +9,9 @@ toc: true
 ---
 
 *****************************************************************************************************************************
-NOTE: we are currently using Gamma, so only positive angle values, but we want to take into account negative as well
+Use PI rather than CI 
+Robinson not convinced with Gamma models
+Classify Good, Meh, and Bad posture and highlight horizontally
 *****************************************************************************************************************************
 
 ## Set-up
@@ -168,6 +170,9 @@ summary_df %>%
 
 ```{r}
 glmer_cd <- glmer((lower_back + 6) ~  posture + (1 | participant), family = Gamma(link = "identity"), data = model_data)
+
+glmer_cd <- lmer(lower_back ~  posture + (1 | participant), data = model_data)
+
 S(glmer_cd)
 plot(glmer_cd)
 ```
@@ -189,11 +194,36 @@ model_preds_lb <- emmeans(custom_preds,
                          ) %>% 
   as_tibble()
 
+model_preds_lb_pi <- predict(custom_preds, 
+                         specs = ~ posture,
+                         type = "response",
+                         interval = "prediction"
+                         ) %>% 
+  as_tibble()
+
+plot(custom_preds, PIs = TRUE)
+
 model_preds_lb  %>%
   ggplot(aes(color = posture)) +
-  geom_point(aes(y = posture, x = response)) +
-  geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  
+  # confidence interval
+  geom_point(aes(y = posture, x = emmean), size = 3) +
+  # geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0) +
+  
+  # prediction interval
+  geom_point(data = model_preds_lb_pi, 
+             aes(y = posture, x = prediction)) +
+  geom_errorbar(data = model_preds_lb_pi,
+                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, size = 2, alpha = .2) +
+  
   geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  
+  # observed
+  geom_point(data = model_data,
+             aes(x = lower_back,
+                 y = posture),
+             alpha = 0.2) +
   theme_minimal() +
   labs(
     title = "GLMM: Lower Back Sensor",
@@ -378,6 +408,12 @@ time_ranges <- free_norm_classified %>%
 # Save data
 write_csv(free_norm_classified, "data/free_15min_classified.csv")
 write_csv(time_ranges, "data/time_ranges_for_plotting.csv")
+```
+
+```{r}
+#| messsage: false
+free_norm_classified <- read_csv(here("data", "free_15min_classified.csv"))
+time_ranges <- read_csv(here("data", "time_ranges_for_plotting.csv"))
 ```
 
 ```{r}
