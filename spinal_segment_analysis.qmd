@@ -532,11 +532,12 @@ plot_classifications_advanced <- function(df, PI, loc, p) {
     filter(participant == p, device_location == loc)
   
   # Get unique postures from PI
-  postures <- unique(PI$posture)
+  postures <- levels(droplevels(PI$posture, exclude = "laying back"))
   
   # --- Calculate Posture Proportions ---
   # Create a list of posture intervals for classification
   posture_intervals <- PI %>%
+    filter(posture != "laying back") %>%
     select(posture, lower.PL, upper.PL) %>%
     split(.$posture)
   
@@ -617,7 +618,8 @@ plot_classifications_advanced <- function(df, PI, loc, p) {
   all_posture_levels <- c(postures, "Unclassified")
   
   # Generate the plot
-  classification_plot <- ggplot(plot_data) +
+  classification_plot <- plot_data %>%
+    ggplot() +
     # Line plot for the actual data
     geom_line(aes(x = normalized_chip_time, y = normalized_angle_x)) +
     # Rectangles for posture zones
@@ -633,13 +635,7 @@ plot_classifications_advanced <- function(df, PI, loc, p) {
       x = "Normalized Chip Time",
       y = "Normalized Angle X",
       fill = "Posture Type"
-    ) +
-    scale_fill_manual(
-      values = posture_colors,
-      labels = legend_labels_with_props,
-      # breaks = all_posture_levels,
-      drop = FALSE
-    )
+    ) 
   
   print(proportions_tbl)
   
