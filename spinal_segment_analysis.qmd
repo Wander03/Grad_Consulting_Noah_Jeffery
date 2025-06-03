@@ -525,10 +525,133 @@ plot_classifications <- function(df, PI, loc, p) {
 }
 ```
 
+```{r}
+plot_classifications_advanced <- function(df, PI, loc, p) {
+  # Filter data for this participant and location
+  plot_data <- df %>%
+    filter(participant == p, device_location == loc)
+  
+  # Get unique postures from PI
+  postures <- unique(PI$posture)
+  
+  # --- Calculate Posture Proportions ---
+  # Create a list of posture intervals for classification
+  posture_intervals <- PI %>%
+    select(posture, lower.PL, upper.PL) %>%
+    split(.$posture)
+  
+  # Classify each data point
+  plot_data_classified <- plot_data %>%
+    mutate(posture_group = "Unclassified")
+  
+  # Apply classification by checking each posture's interval
+  for (post in postures) {
+    interval <- posture_intervals[[post]]
+    plot_data_classified <- plot_data_classified %>%
+      mutate(
+        posture_group = ifelse(
+          normalized_angle_x >= interval$lower.PL & 
+          normalized_angle_x <= interval$upper.PL,
+          post,
+          posture_group
+        )
+      )
+  }
+  
+  # Convert to factor with levels
+  # plot_data_classified <- plot_data_classified %>%
+  #   mutate(
+  #     posture_group = factor(posture_group, levels = c(postures, "Unclassified"))
+  #   )
+  
+  # Calculate proportions for each posture group
+  proportions_tbl <- plot_data_classified %>%
+    group_by(posture_group) %>%
+    summarise(proportion = n() / nrow(plot_data_classified)) %>%
+    complete(posture_group, fill = list(proportion = 0)) %>%
+    arrange(posture_group)
+
+  # Create legend labels with proportions
+  legend_labels_with_props <- paste0(
+    proportions_tbl$posture_group, 
+    " (", 
+    scales::percent(proportions_tbl$proportion, accuracy = 1),
+    ")"
+  )
+  # --- End Calculate Posture Proportions ---
+  
+  # Create a dataframe for the background rectangles representing posture zones
+  time_ranges <- PI %>%
+    select(posture, lower.PL, upper.PL) %>%
+    mutate(
+      xmin = 0,
+      xmax = 1,
+      ymin = lower.PL,
+      ymax = upper.PL
+    )
+  
+  # Add unclassified areas (below lowest lower and above highest upper)
+  unclassified_ranges <- data.frame(
+    posture = "Unclassified",
+    xmin = 0,
+    xmax = 1,
+    ymin = c(-Inf, max(PI$upper.PL)),
+    ymax = c(min(PI$lower.PL), Inf)
+  )
+  
+  # Combine all ranges
+  all_ranges <- bind_rows(
+    time_ranges,
+    unclassified_ranges
+  ) %>%
+    mutate(
+      posture = factor(posture, levels = c(postures, "Unclassified"))
+    )
+  
+  # Generate color palette (one color per posture + gray for unclassified)
+  posture_colors <- setNames(
+    c(scales::hue_pal()(length(postures)), "gray80"),
+    c(postures, "Unclassified")
+  )
+  
+  all_posture_levels <- c(postures, "Unclassified")
+  
+  # Generate the plot
+  classification_plot <- ggplot(plot_data) +
+    # Line plot for the actual data
+    geom_line(aes(x = normalized_chip_time, y = normalized_angle_x)) +
+    # Rectangles for posture zones
+    geom_rect(
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = posture), 
+      alpha = 0.4, 
+      data = all_ranges
+    ) +
+    theme_minimal() +
+    labs(
+      title = paste("Posture Classification for Participant", p),
+      subtitle = paste("Location:", loc, "- 15min Free Section"),
+      x = "Normalized Chip Time",
+      y = "Normalized Angle X",
+      fill = "Posture Type"
+    ) +
+    scale_fill_manual(
+      values = posture_colors,
+      labels = legend_labels_with_props,
+      # breaks = all_posture_levels,
+      drop = FALSE
+    )
+  
+  print(proportions_tbl)
+  
+  return(classification_plot)
+}
+```
+
 #### Lower Back
 
 ```{r}
 plot_classifications(free_norm, model_preds_lb_pi, "lower_back", 3)
+plot_classifications_advanced(free_norm, model_preds_lb_pi, "lower_back", 3)
 ```
 
 #### Lower Back
