@@ -337,7 +337,7 @@ model_preds_n %>%
              alpha = 0.2) +
   theme_minimal() +
   labs(
-    title = "LMM: Mid Back Sensor",
+    title = "LMM: Neck Sensor",
     x = "Angle X",
     y = "Posture"
     ) +
