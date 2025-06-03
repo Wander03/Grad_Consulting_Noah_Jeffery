@@ -164,7 +164,7 @@ model_preds_lb %>%
   ggplot(aes(color = posture)) +
 
   # confidence interval
-  geom_point(aes(y = posture, x = emmean), size = 3) +
+  geom_point(aes(y = posture, x = response), size = 3) +
   # geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
   geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0) +
 
@@ -281,9 +281,9 @@ plot(lmer_n)
 glmer_n <- glmer((neck*-1)+15 ~ posture + (1 | participant), family = Gamma(link = "identity"), data = model_data)
 
 
-S(glmer_fe)
-Anova(glmer_fe)
-plot(glmer_fe)
+S(glmer_n)
+Anova(glmer_n)
+plot(glmer_n)
 ```
 
 ```{r}
