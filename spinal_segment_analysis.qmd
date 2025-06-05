@@ -8,18 +8,11 @@ code-fold: true
 toc: true
 ---
 
-*****************************************************************************************************************************
-Use PI rather than CI 
-Robinson not convinced with Gamma models
-Classify Good, Meh, and Bad posture and highlight horizontally
-*****************************************************************************************************************************
-
 ## Set-up
 
 ```{r}
 #| warning: false
 #| message: false
-library(tidyverse)
 library(here)
 library(lubridate)
 library(lme4)
@@ -29,6 +22,8 @@ library(emmeans)
 library(ggridges)
 library(viridis)
 library(hrbrthemes)
+library(MASS)
+library(tidyverse)
 ```
 
 ## Data Read-in
@@ -42,11 +37,8 @@ free <- read_csv(here("data", "free_15min.csv")) %>%
       levels = as.character(sort(as.numeric(unique(participant))))
       )
   ) %>%
-  select(-angle_y, -angle_z)
+  dplyr::select(-angle_y, -angle_z)
 instructed <- read_csv(here("data", "instructed.csv"))
-
-free_norm_classified <- read_csv(here("data", "free_15min_classified.csv"))
-time_ranges <- read_csv(here("data", "time_ranges_for_plotting.csv"))
 ```
 
 ### Data Cleaning
@@ -67,7 +59,7 @@ free_norm <- free %>%
   # If two or more normalized_chip_time values have multiple angle_x values, take the average
   group_by(participant, device_location, normalized_chip_time) %>%
   mutate(normalized_angle_x = mean(angle_x)) %>%
-  select(-c(time_min_sec, time_max_sec, time_range_sec))
+  dplyr::select(-c(time_min_sec, time_max_sec, time_range_sec))
 ```
 
 #### Aggregating Data by Second for Instructed Section
@@ -103,6 +95,13 @@ model_data <- instructed_agg_nested %>%
     "mid_back" = 4,
     "neck" = 5
   )
+
+model_data_free <- free_norm %>% 
+  group_by(participant, device_location) %>%
+  summarize(angle_x = mean(angle_x, na.rm = TRUE)) %>%
+  ungroup() %>%
+  pivot_wider(id_cols = participant, names_from = device_location, values_from = angle_x) %>%
+  ungroup()
 ```
 
 ## Data Visualization Settings
@@ -169,21 +168,20 @@ summary_df %>%
 ### Lower Back
 
 ```{r}
-glmer_cd <- glmer((lower_back + 6) ~  posture + (1 | participant), family = Gamma(link = "identity"), data = model_data)
+lmer_lb <- lmer(lower_back ~  posture + (1 + posture  | participant), data = model_data)
 
-glmer_cd <- lmer(lower_back ~  posture + (1 | participant), data = model_data)
-
-S(glmer_cd)
-plot(glmer_cd)
+plot(lmer_lb)
+S(lmer_lb)
 ```
 
 ```{r}
+#| warning: false
 custom_combos <- data.frame(
   posture = model_data$posture %>% unique()
 )
 
 custom_preds <- ref_grid(
-  glmer_cd,
+  lmer_lb,
   data = custom_combos,
   cov.reduce = FALSE,
 )
@@ -201,21 +199,20 @@ model_preds_lb_pi <- predict(custom_preds,
                          ) %>% 
   as_tibble()
 
-plot(custom_preds, PIs = TRUE)
+# plot(custom_preds, PIs = TRUE)
 
 model_preds_lb  %>%
   ggplot(aes(color = posture)) +
   
   # confidence interval
   geom_point(aes(y = posture, x = emmean), size = 3) +
-  # geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
   geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0, linewidth = 1) +
   
   # prediction interval
   geom_point(data = model_preds_lb_pi, 
              aes(y = posture, x = prediction)) +
   geom_errorbar(data = model_preds_lb_pi,
-                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, linewidth = 1, alpha = .2) +
+                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, linewidth = 4, alpha = .3) +
   
   geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
   
@@ -226,7 +223,7 @@ model_preds_lb  %>%
              alpha = 0.2) +
   theme_minimal() +
   labs(
-    title = "GLMM: Lower Back Sensor",
+    title = "LMM: Lower Back Sensor",
     x = "Angle X",
     y = "Posture"
     ) +
@@ -237,15 +234,20 @@ model_preds_lb  %>%
 ### Mid Back
 
 ```{r}
-glmer_ea <- glmer(mid_back+40 ~ posture + (1  | participant), family = Gamma(link = "identity"), data = model_data)
-S(glmer_ea)
-Anova(glmer_ea)
-plot(glmer_ea)
+lmer_mb <- lmer(mid_back ~ posture + (1 | participant), data = model_data)
+
+plot(lmer_mb)
+S(lmer_mb)
 ```
 
 ```{r}
+#| warning: false
+custom_combos <- data.frame(
+  posture = model_data$posture %>% unique()
+)
+
 custom_preds <- ref_grid(
-  glmer_ea,
+  lmer_mb,
   data = custom_combos,
   cov.reduce = FALSE,
 )
@@ -263,16 +265,34 @@ model_preds_mb_pi <- predict(custom_preds,
                          ) %>% 
   as_tibble()
 
-model_preds_mb %>%
-  mutate(emmean = -1*(emmean-40),
-         asymp.LCL = -1*(asymp.LCL-40),
-         asymp.UCL = -1*(asymp.UCL-40)) %>%
+plot(custom_preds, PIs = TRUE)
+
+model_preds_mb  %>%
   ggplot(aes(color = posture)) +
-  geom_point(aes(y = posture, x = emmean)) +
-  geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  
+  # confidence interval
+  geom_point(aes(y = posture, x = emmean), size = 3) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0, linewidth = 1) +
+  
+  # prediction interval
+  geom_point(data = model_preds_mb_pi, 
+             aes(y = posture, x = prediction)) +
+  geom_errorbar(data = model_preds_mb_pi,
+                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, linewidth = 4, alpha = .3) +
+  
   geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  
+  # observed
+  geom_point(data = model_data,
+             aes(x = mid_back,
+                 y = posture),
+             alpha = 0.2) +
   theme_minimal() +
-  labs(title = "GLMM: Mid Back Sensor") +
+  labs(
+    title = "LMM: Mid Back Sensor",
+    x = "Angle X",
+    y = "Posture"
+    ) +
   theme(legend.position = "none",
         plot.title.position = "plot")
 ```
@@ -280,15 +300,20 @@ model_preds_mb %>%
 ### Neck
 
 ```{r}
-glmer_fe <- glmer((neck*-1)+15 ~ posture + (1 | participant), family = Gamma(link = "identity"), data = model_data)
-S(glmer_fe)
-Anova(glmer_fe)
-plot(glmer_fe)
+lmer_n <- lmer(neck ~ posture + (1 | participant), data = model_data)
+
+plot(lmer_n)
+S(lmer_n)
 ```
 
 ```{r}
+#| warning: false
+custom_combos <- data.frame(
+  posture = model_data$posture %>% unique()
+)
+
 custom_preds <- ref_grid(
-  glmer_fe,
+  lmer_n,
   data = custom_combos,
   cov.reduce = FALSE,
 )
@@ -299,7 +324,6 @@ model_preds_n <- emmeans(custom_preds,
                          ) %>% 
   as_tibble()
 
-
 model_preds_n_pi <- predict(custom_preds, 
                          specs = ~ posture,
                          type = "response",
@@ -307,16 +331,34 @@ model_preds_n_pi <- predict(custom_preds,
                          ) %>% 
   as_tibble()
 
+plot(custom_preds, PIs = TRUE)
+
 model_preds_n  %>%
-  mutate(response = -1*(response-15),
-       asymp.LCL = -1*(asymp.LCL-15),
-       asymp.UCL = -1*(asymp.UCL-15)) %>%
   ggplot(aes(color = posture)) +
-  geom_point(aes(y = posture, x = response)) +
-  geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  
+  # confidence interval
+  geom_point(aes(y = posture, x = emmean), size = 3) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0, linewidth = 1) +
+  
+  # prediction interval
+  geom_point(data = model_preds_n_pi, 
+             aes(y = posture, x = prediction)) +
+  geom_errorbar(data = model_preds_n_pi,
+                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, linewidth = 4, alpha = .3) +
+  
   geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
+  
+  # observed
+  geom_point(data = model_data,
+             aes(x = neck,
+                 y = posture),
+             alpha = 0.2) +
   theme_minimal() +
-  labs(title = "GLMM: Neck Sensor") +
+  labs(
+    title = "LMM: Neck Sensor",
+    x = "Angle X",
+    y = "Posture"
+    ) +
   theme(legend.position = "none",
         plot.title.position = "plot")
 ```
@@ -340,102 +382,12 @@ free_norm %>%
   ylim(-50, 50)
 ```
 
-
-```{r}
-#| eval: false
-posture_cis <- model_preds_lb %>%
-  left_join(model_preds_mb, by = "posture", suffix = c("_lower_back", "_mid_back")) %>%
-  left_join(model_preds_n, by = "posture", suffix = c("_lower_back", "_neck")) %>%
-  rename(
-    response_mid_back = emmean,
-    asymp.LCL_neck = asymp.LCL,
-    asymp.UCL_neck = asymp.UCL
-  ) %>%
-  select(posture, starts_with("response"), starts_with("asymp")) %>%
-  pivot_longer(
-    cols = -posture,
-    names_to = c(".value", "location"),
-    names_pattern = "(asymp\\.[LU]CL)(_.+)$"
-  ) %>%
-  rename(
-    lower = asymp.LCL,
-    upper = asymp.UCL
-  ) %>%
-  filter(!is.na(lower)) %>%
-  mutate(location = gsub("^_", "", location)) %>%
-  arrange(factor(posture, levels = posture_priority))
-
-# Return all matching postures as a list column
-classify_postures <- function(angles, locations, rules) {
-  # Create all possible combinations
-  expand_grid(
-    angle = angles,
-    loc = locations,
-    posture = unique(rules$posture)
-  ) %>%
-  left_join(rules, by = c("loc" = "location", "posture")) %>%
-  mutate(
-    matches = angle >= lower & angle <= upper & !is.na(angle)
-  ) %>%
-  group_by(angle, loc) %>%
-  summarise(
-    postures = if(any(matches)) {
-      paste(sort(unique(posture[matches])), collapse = "+")
-    } else {
-      "unknown"
-    },
-    .groups = "drop"
-  ) %>%
-  right_join(
-    tibble(angle = angles, loc = locations),
-    by = c("angle", "loc")
-  ) %>%
-  mutate(postures = coalesce(postures, "unknown")) %>%
-  pull(postures)
-}
-
-# Apply classification and prepare data for plotting
-free_norm_classified <- free_norm %>%
-  mutate(
-    classified_posture = classify_postures(
-      angles = angle_x,
-      locations = device_location,
-      rules = posture_cis
-    )
-  )
-
-time_ranges <- free_norm_classified %>%
-  group_by(participant, device_location) %>%
-  mutate(
-    posture_change = classified_posture != lag(classified_posture, default = first(classified_posture)),
-    segment_id = cumsum(posture_change)
-  ) %>%
-  group_by(participant, device_location, segment_id, classified_posture) %>%
-  summarise(
-    xmin = min(normalized_chip_time),
-    xmax = max(normalized_chip_time),
-    ymin = min(normalized_angle_x),
-    ymax = max(normalized_angle_x),
-    .groups = "drop"
-  )
-
-# Save data
-write_csv(free_norm_classified, "data/free_15min_classified.csv")
-write_csv(time_ranges, "data/time_ranges_for_plotting.csv")
-```
-
-```{r}
-#| messsage: false
-free_norm_classified <- read_csv(here("data", "free_15min_classified.csv"))
-time_ranges <- read_csv(here("data", "time_ranges_for_plotting.csv"))
-```
-
 ```{r}
 plot_classifications <- function(df, PI, loc, p) {
   # Filter data for this participant and location
   plot_data <- df %>%
     filter(participant == p, device_location == loc)
-  
+
   # Extract good posture prediction interval limits
   good_lower <- PI %>% filter(posture == "good") %>% pull(lower.PL)
   good_upper <- PI %>% filter(posture == "good") %>% pull(upper.PL)
@@ -531,13 +483,15 @@ plot_classifications_advanced <- function(df, PI, loc, p) {
   plot_data <- df %>%
     filter(participant == p, device_location == loc)
   
+  # Remove "laying back" posture
+  PI <- PI %>% filter(posture != "laying back") 
+  
   # Get unique postures from PI
   postures <- levels(droplevels(PI$posture, exclude = "laying back"))
   
   # --- Calculate Posture Proportions ---
   # Create a list of posture intervals for classification
   posture_intervals <- PI %>%
-    filter(posture != "laying back") %>%
     select(posture, lower.PL, upper.PL) %>%
     split(.$posture)
   
@@ -558,12 +512,6 @@ plot_classifications_advanced <- function(df, PI, loc, p) {
         )
       )
   }
-  
-  # Convert to factor with levels
-  # plot_data_classified <- plot_data_classified %>%
-  #   mutate(
-  #     posture_group = factor(posture_group, levels = c(postures, "Unclassified"))
-  #   )
   
   # Calculate proportions for each posture group
   proportions_tbl <- plot_data_classified %>%
@@ -591,14 +539,40 @@ plot_classifications_advanced <- function(df, PI, loc, p) {
       ymax = upper.PL
     )
   
-  # Add unclassified areas (below lowest lower and above highest upper)
-  unclassified_ranges <- data.frame(
-    posture = "Unclassified",
-    xmin = 0,
-    xmax = 1,
-    ymin = c(-Inf, max(PI$upper.PL)),
-    ymax = c(min(PI$lower.PL), Inf)
-  )
+  # Add unclassified areas
+  sorted_intervals <- PI %>%
+    arrange(lower.PL) %>%
+    select(lower.PL, upper.PL)
+  
+  unclassified_ranges <- data.frame(ymin = numeric(), ymax = numeric())
+  
+  if (min(sorted_intervals$lower.PL) > -Inf) {
+    unclassified_ranges <- rbind(unclassified_ranges, 
+                                data.frame(ymin = -Inf, ymax = min(sorted_intervals$lower.PL)))
+  }
+  
+  for (i in 1:(nrow(sorted_intervals)-1)) {
+    if (sorted_intervals$upper.PL[i] < sorted_intervals$lower.PL[i+1]) {
+      unclassified_ranges <- rbind(unclassified_ranges,
+                                  data.frame(ymin = sorted_intervals$upper.PL[i],
+                                            ymax = sorted_intervals$lower.PL[i+1]))
+    }
+  }
+  
+  if (max(sorted_intervals$upper.PL) < Inf) {
+    unclassified_ranges <- rbind(unclassified_ranges,
+                                data.frame(ymin = max(sorted_intervals$upper.PL),
+                                          ymax = Inf))
+  }
+  
+  if (nrow(unclassified_ranges) > 0) {
+    unclassified_ranges <- unclassified_ranges %>%
+      mutate(
+        posture = "Unclassified",
+        xmin = 0,
+        xmax = 1
+      )
+  }
   
   # Combine all ranges
   all_ranges <- bind_rows(
@@ -608,12 +582,6 @@ plot_classifications_advanced <- function(df, PI, loc, p) {
     mutate(
       posture = factor(posture, levels = c(postures, "Unclassified"))
     )
-  
-  # Generate color palette (one color per posture + gray for unclassified)
-  posture_colors <- setNames(
-    c(scales::hue_pal()(length(postures)), "gray80"),
-    c(postures, "Unclassified")
-  )
   
   all_posture_levels <- c(postures, "Unclassified")
   
@@ -653,13 +621,15 @@ plot_classifications_advanced(free_norm, model_preds_lb_pi, "lower_back", 3)
 #### Lower Back
 
 ```{r}
-plot_classifications(free_norm, model_preds_mb_pi, 3, "mid_back")
+plot_classifications(free_norm, model_preds_mb_pi, "mid_back", 3)
+plot_classifications_advanced(free_norm, model_preds_mb_pi, "mid_back", 3)
 ```
 
-#### Lower Back
+#### Neck
 
 ```{r}
-plot_classifications(free_norm, model_preds_n_pi, 3, "neck")
+plot_classifications(free_norm, model_preds_n_pi, "neck", 3)
+plot_classifications_advanced(free_norm, model_preds_n_pi, "neck", 3)
 ```
 
 ### Ridge Plots
@@ -770,5 +740,39 @@ free_norm %>%
     xlim(-50, 70)
 ```
 
+### Linear Discriminant Analysis (LDA) for Classification
 
+```{r}
+lda_posture <- lda(posture ~ lower_back + mid_back + neck, data = model_data %>% filter(posture != "laying back"))
+lda_posture
+
+act_vs_pred <- model_data %>%
+  filter(posture != "laying back") %>%
+  drop_na() %>%
+  mutate(
+    posture = factor(posture),
+    lda_pred = factor(predict(lda_posture)$class)
+  )
+
+caret::confusionMatrix(data = act_vs_pred$lda_pred, reference = act_vs_pred$posture)
+```
+
+```{r}
+predicted <- predict(lda_posture, free_norm)
+predicted
+```
+
+```{r}
+lda_plot <- cbind(model_data %>% filter(posture != "laying back") %>% drop_na(), predict(lda_posture)$x)
+
+ggplot(lda_plot, aes(LD1, LD2)) +
+  geom_point(aes(color = posture)) +
+  theme_bw()
+
+lda_plot <- cbind(model_data %>% filter(posture != "laying back") %>% drop_na(), predicted$x)
+
+ggplot(lda_plot, aes(LD1, LD2)) +
+  geom_point(aes(color = posture)) +
+  theme_bw()
+```
 
