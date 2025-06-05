@@ -168,11 +168,15 @@ summary_df %>%
 ### Lower Back
 
 ```{r}
+
 lmer_lb <- lmer(lower_back ~  posture + (1 + posture  | participant), data = model_data)
 
 plot(lmer_lb)
-S(lmer_lb)
+qqnorm(residuals(lmer_lb))
+qqline(residuals(lmer_lb))
 ```
+
+
 
 ```{r}
 #| warning: false
@@ -199,21 +203,22 @@ model_preds_lb_pi <- predict(custom_preds,
                          ) %>% 
   as_tibble()
 
-# plot(custom_preds, PIs = TRUE)
+plot(custom_preds, PIs = TRUE, )
 
-model_preds_lb  %>%
+model_preds_lb %>%
   ggplot(aes(color = posture)) +
-  
+
   # confidence interval
   geom_point(aes(y = posture, x = emmean), size = 3) +
-  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0, linewidth = 1) +
-  
+  # geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0, size = 2) +
+
   # prediction interval
-  geom_point(data = model_preds_lb_pi, 
+  geom_point(data = model_preds_lb_pi,
              aes(y = posture, x = prediction)) +
   geom_errorbar(data = model_preds_lb_pi,
-                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, linewidth = 4, alpha = .3) +
-  
+                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width =0, size = 3, alpha = .4) +
+
   geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
   
   # observed
@@ -237,7 +242,8 @@ model_preds_lb  %>%
 lmer_mb <- lmer(mid_back ~ posture + (1 | participant), data = model_data)
 
 plot(lmer_mb)
-S(lmer_mb)
+qqnorm(residuals(lmer_mb))
+qqline(residuals(lmer_mb))
 ```
 
 ```{r}
@@ -265,21 +271,22 @@ model_preds_mb_pi <- predict(custom_preds,
                          ) %>% 
   as_tibble()
 
-plot(custom_preds, PIs = TRUE)
+plot(custom_preds, PIs = TRUE, )
 
-model_preds_mb  %>%
+model_preds_mb %>%
   ggplot(aes(color = posture)) +
-  
+
   # confidence interval
   geom_point(aes(y = posture, x = emmean), size = 3) +
-  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0, linewidth = 1) +
-  
+  # geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0) +
+
   # prediction interval
-  geom_point(data = model_preds_mb_pi, 
+  geom_point(data = model_preds_mb_pi,
              aes(y = posture, x = prediction)) +
   geom_errorbar(data = model_preds_mb_pi,
-                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, linewidth = 4, alpha = .3) +
-  
+                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, size = 2, alpha = .4) +
+
   geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
   
   # observed
@@ -303,10 +310,12 @@ model_preds_mb  %>%
 lmer_n <- lmer(neck ~ posture + (1 | participant), data = model_data)
 
 plot(lmer_n)
-S(lmer_n)
+qqnorm(residuals(lmer_n))
+qqline(residuals(lmer_n))
 ```
 
 ```{r}
+
 #| warning: false
 custom_combos <- data.frame(
   posture = model_data$posture %>% unique()
@@ -333,19 +342,20 @@ model_preds_n_pi <- predict(custom_preds,
 
 plot(custom_preds, PIs = TRUE)
 
-model_preds_n  %>%
+model_preds_n %>%
   ggplot(aes(color = posture)) +
-  
+
   # confidence interval
   geom_point(aes(y = posture, x = emmean), size = 3) +
-  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0, linewidth = 1) +
-  
+  # geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0) +
+
   # prediction interval
-  geom_point(data = model_preds_n_pi, 
+  geom_point(data = model_preds_n_pi,
              aes(y = posture, x = prediction)) +
   geom_errorbar(data = model_preds_n_pi,
-                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, linewidth = 4, alpha = .3) +
-  
+                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, size = 2, alpha = .4) +
+
   geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
   
   # observed
@@ -363,24 +373,8 @@ model_preds_n  %>%
         plot.title.position = "plot")
 ```
 
-## Visualizations for 15 Minute Section
 
-### All Participants
 
-```{r}
-free_norm %>%
-  ggplot() +
-    geom_line(aes(x = normalized_chip_time, y = normalized_angle_x, color = participant)) +
-    facet_wrap(vars(device_location), nrow = 3, ncol = 1) +
-    theme(
-    strip.text = element_text(size = 8),  # Adjust label size
-    axis.text = element_text(size = 6),   # Adjust axis text size
-    plot.margin = unit(c(1, 1, 1, 1), "mm") # Adjust plot margins
-  ) +
-  labs(title = "Normalized Angle X by Normalized Chip Time") +
-  theme_bw() +
-  ylim(-50, 50)
-```
 
 ```{r}
 plot_classifications <- function(df, PI, loc, p) {
