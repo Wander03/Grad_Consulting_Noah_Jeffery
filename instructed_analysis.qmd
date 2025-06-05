@@ -13,6 +13,7 @@ library(tidyverse)
 library(here)
 library(lubridate)
 library(lme4)
+library(MASS)
 library(nlme)
 library(car)
 library(emmeans)
@@ -350,4 +351,28 @@ model_preds_n %>%
   theme(legend.position = "none",
         plot.title.position = "plot")
 ```
+
+```{r}
+lda_posture <- lda(posture ~ lower_back + mid_back + neck, data = model_data)
+lda_posture
+
+```
+
+
+```{r}
+act_vs_pred <- model_data %>%
+  drop_na() %>%
+  mutate(
+    posture = factor(posture),
+    lda_pred = factor(predict(lda_posture)$class),
+    qda_pred = factor(predict(qda_posture)$class)
+  )
+
+
+caret::confusionMatrix(data = act_vs_pred$lda_pred, reference = act_vs_pred$posture)
+
+caret::confusionMatrix(data = act_vs_pred$qda_pred, reference = act_vs_pred$posture)
+
+```
+
 
