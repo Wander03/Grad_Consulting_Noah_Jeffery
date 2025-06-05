@@ -356,6 +356,9 @@ model_preds_n %>%
 lda_posture <- lda(posture ~ lower_back + mid_back + neck, data = model_data)
 lda_posture
 
+
+qda_posture <- qda(posture ~ lower_back + mid_back + neck, data = model_data)
+qda_posture
 ```
 
 
@@ -374,5 +377,47 @@ caret::confusionMatrix(data = act_vs_pred$lda_pred, reference = act_vs_pred$post
 caret::confusionMatrix(data = act_vs_pred$qda_pred, reference = act_vs_pred$posture)
 
 ```
+```{r}
+lda_posture_preds <- model_data %>%
+  drop_na() %>%
+  bind_cols(
+    predict(lda_posture)$posterior
+  )
+```
+
+```{r}
+model_data %>%
+  drop_na() %>%
+  bind_cols(
+    as.matrix(model_data %>% dplyr::select(lower_back, mid_back, neck) %>%
+  drop_na()) %*% lda_posture$scaling
+  ) %>%
+  ggplot() +
+  geom_point(aes(x = LD1, y = LD2, color = posture)) + 
+  theme_minimal()
+
+model_data %>%
+  drop_na() %>%
+  bind_cols(
+    as.matrix(model_data %>% dplyr::select(lower_back, mid_back, neck) %>%
+  drop_na()) %*% lda_posture$scaling
+  ) %>%
+  ggplot() +
+  geom_point(aes(x = LD1, y = LD3, color = posture)) + 
+  theme_minimal()
+
+
+model_data %>%
+  drop_na() %>%
+  bind_cols(
+    as.matrix(model_data %>% dplyr::select(lower_back, mid_back, neck) %>%
+  drop_na()) %*% lda_posture$scaling
+  ) %>%
+  ggplot() +
+  geom_point(aes(x = LD2, y = LD3, color = posture)) + 
+  theme_minimal()
+
+```
+
 
 
