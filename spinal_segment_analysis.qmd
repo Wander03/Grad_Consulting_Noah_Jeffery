@@ -393,11 +393,11 @@ plot_classifications <- function(df, PI, loc, p) {
   good_upper <- PI %>% filter(posture == "good") %>% pull(upper.PL)
 
   # TEMP Definition of Meh Posture
-  meh_low_lower <- good_lower - 3
-  meh_low_upper <- good_lower
+  # meh_low_lower <- good_lower - 3
+  # meh_low_upper <- good_lower
   
-  meh_high_lower <- good_upper
-  meh_high_upper <- good_upper + 3
+  # meh_high_lower <- good_upper
+  # meh_high_upper <- good_upper + 3
   
   # --- Calculate Posture Proportions ---
   plot_data_classified <- plot_data %>%
@@ -405,11 +405,12 @@ plot_classifications <- function(df, PI, loc, p) {
       # Classify each data point
       posture_group = case_when(
         normalized_angle_x >= good_lower & normalized_angle_x <= good_upper ~ "Good",
-        (normalized_angle_x >= meh_low_lower & normalized_angle_x < good_lower) |
-        (normalized_angle_x > good_upper & normalized_angle_x <= meh_high_upper) ~ "Meh",
+        # (normalized_angle_x >= meh_low_lower & normalized_angle_x < good_lower) |
+        # (normalized_angle_x > good_upper & normalized_angle_x <= meh_high_upper) ~ "Meh",
         TRUE ~ "Bad"
       ),
-      posture_group = factor(posture_group, levels = c("Good", "Meh", "Bad"))
+      # posture_group = factor(posture_group, levels = c("Good", "Meh", "Bad"))
+      posture_group = factor(posture_group, levels = c("Good", "Bad"))
     )
   
   # Calculate proportions for each posture group
@@ -433,8 +434,10 @@ plot_classifications <- function(df, PI, loc, p) {
   xmax_rect <- 1
   
   # Define y-axis limits for the different posture classification zones
-  ymin_rect <- c(-Inf, meh_low_lower, good_lower, good_upper, meh_high_upper)
-  ymax_rect <- c(meh_low_lower, good_lower, good_upper, meh_high_upper, Inf)
+  # ymin_rect <- c(-Inf, meh_low_lower, good_lower, good_upper, meh_high_upper)
+  # ymax_rect <- c(meh_low_lower, good_lower, good_upper, meh_high_upper, Inf)
+  ymin_rect <- c(-Inf, good_lower, good_upper)
+  ymax_rect <- c(good_lower, good_upper, Inf)
   
   # Create a dataframe for the background rectangles representing posture zones
   time_ranges <- data.frame(
@@ -442,8 +445,10 @@ plot_classifications <- function(df, PI, loc, p) {
     xmax = xmax_rect,  
     ymin = ymin_rect,  
     ymax = ymax_rect,
-    posture_cat = factor(c("Bad", "Meh", "Good", "Meh", "Bad"), 
-                         levels = c("Good", "Meh", "Bad"))
+    # posture_cat = factor(c("Bad", "Meh", "Good", "Meh", "Bad"), 
+    #                      levels = c("Good", "Meh", "Bad"))
+    posture_cat = factor(c("Bad", "Good", "Bad"), 
+                         levels = c("Good", "Bad"))
   )
   
   # Generate the plot
@@ -465,8 +470,10 @@ plot_classifications <- function(df, PI, loc, p) {
       fill = "Posture Type"
     ) +
     scale_fill_manual(
-      values = c("Good" = "seagreen3", "Meh" = "gold", "Bad" = "salmon"),
-      breaks = c("Good", "Meh", "Bad"),
+      # values = c("Good" = "seagreen3", "Meh" = "gold", "Bad" = "salmon"),
+      values = c("Good" = "seagreen3", "Bad" = "salmon"),
+      # breaks = c("Good", "Meh", "Bad"),
+      breaks = c("Good", "Bad"),
       labels = legend_labels_with_props
     )
   
