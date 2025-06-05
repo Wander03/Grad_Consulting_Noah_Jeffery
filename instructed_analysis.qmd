@@ -112,7 +112,7 @@ instructed_agg %>%
 ### Lower Back
 
 
-lmer_lb <- lmer(lower_back ~  posture + (1 + posture | participant), data = model_data)
+lmer_lb <- lmer(lower_back ~  posture + (1 + posture  | participant), data = model_data)
 
 plot(lmer_lb)
 qqnorm(residuals(lmer_lb))
@@ -164,15 +164,15 @@ model_preds_lb %>%
   ggplot(aes(color = posture)) +
 
   # confidence interval
-  geom_point(aes(y = posture, x = emmean), size = 3) +
+  geom_point(aes(y = posture, x = response), size = 3) +
   # geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
-  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0, size = 2) +
 
   # prediction interval
   geom_point(data = model_preds_lb_pi,
              aes(y = posture, x = prediction)) +
   geom_errorbar(data = model_preds_lb_pi,
-                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, size = 2, alpha = .4) +
+                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width =0, size = 3, alpha = .4) +
 
   geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
   
@@ -189,6 +189,7 @@ model_preds_lb %>%
     ) +
   theme(legend.position = "none",
         plot.title.position = "plot")
+
 ```
 
 
@@ -200,6 +201,8 @@ model_preds_lb %>%
 lmer_mb <- lmer(mid_back ~ posture + (1 | participant), data = model_data)
 
 plot(lmer_mb)
+qqnorm(residuals(lmer_mb))
+qqline(residuals(lmer_mb))
 
 glmer_mb <- glmer(mid_back+40 ~ posture + (1  | participant), family = Gamma(link = "identity"), data = model_data)
 
@@ -277,13 +280,16 @@ model_preds_mb %>%
 lmer_n <- lmer(neck ~ posture + (1 | participant), data = model_data)
 
 plot(lmer_n)
+qqnorm(residuals(lmer_n))
+qqline(residuals(lmer_n))
 
-glmer_n <- glmer((neck*-1)+15 ~ posture + (1 | participant), family = Gamma(link = "identity"), data = model_data)
+
+glmer_n <- glmer((neck*-1/10)+5 ~ posture + (1 | participant), family = Gamma(link = "identity"), data = model_data)
 
 
-S(glmer_fe)
-Anova(glmer_fe)
-plot(glmer_fe)
+S(glmer_n)
+Anova(glmer_n)
+plot(glmer_n)
 ```
 
 ```{r}
