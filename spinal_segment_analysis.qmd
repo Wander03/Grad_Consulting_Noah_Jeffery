@@ -1,18 +1,19 @@
 ---
 title: "Spinal Segment Analysis"
 author: "Brendan Callender and Andrew Kerr"
-format: html
-editor: source
-embed-resources: true
-code-fold: true
-toc: true
+format: 
+  html:
+    toc: true
+    toc-depth: 4
+    code-fold: true
+    code-tools: true
+    embed-resources: true
 ---
-
-## Set-up
 
 ```{r}
 #| warning: false
 #| message: false
+#| include: false
 library(here)
 library(lubridate)
 library(lme4)
@@ -24,6 +25,8 @@ library(viridis)
 library(hrbrthemes)
 library(MASS)
 library(tidyverse)
+
+theme_set(theme_minimal())
 ```
 
 ## Data Read-in
