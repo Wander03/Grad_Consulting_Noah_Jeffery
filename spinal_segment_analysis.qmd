@@ -203,7 +203,7 @@ model_preds_lb_pi <- predict(custom_preds,
                          ) %>% 
   as_tibble()
 
-plot(custom_preds, PIs = TRUE, )
+plot(custom_preds, PIs = TRUE) + theme_bw()
 
 model_preds_lb %>%
   ggplot(aes(color = posture)) +
@@ -271,7 +271,7 @@ model_preds_mb_pi <- predict(custom_preds,
                          ) %>% 
   as_tibble()
 
-plot(custom_preds, PIs = TRUE, )
+plot(custom_preds, PIs = TRUE) + theme_bw()
 
 model_preds_mb %>%
   ggplot(aes(color = posture)) +
@@ -340,7 +340,7 @@ model_preds_n_pi <- predict(custom_preds,
                          ) %>% 
   as_tibble()
 
-plot(custom_preds, PIs = TRUE)
+plot(custom_preds, PIs = TRUE) + theme_bw()
 
 model_preds_n %>%
   ggplot(aes(color = posture)) +
