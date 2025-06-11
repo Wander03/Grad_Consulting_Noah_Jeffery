@@ -163,7 +163,7 @@ summary_df %>%
   theme_bw()
 ```
 
-## Models for Instrcuted Section
+## Models for Instructed Section
 
 ### Lower Back
 
