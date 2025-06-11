@@ -25,6 +25,7 @@ library(viridis)
 library(hrbrthemes)
 library(MASS)
 library(tidyverse)
+library(gt)
 
 theme_set(theme_minimal())
 ```
@@ -183,6 +184,7 @@ qqline(residuals(lmer_lb))
 
 ```{r}
 #| warning: false
+#| echo: false
 custom_combos <- data.frame(
   posture = model_data$posture %>% unique()
 )
@@ -206,7 +208,18 @@ model_preds_lb_pi <- predict(custom_preds,
                          ) %>% 
   as_tibble()
 
-plot(custom_preds, PIs = TRUE) + theme_bw()
+model_preds_lb %>%
+  left_join(model_preds_lb_pi, by = "posture") %>%
+  mutate(
+    Posture = posture,
+    CI = paste0("(", round(emmean - 1.96*SE.x, 2), ", ", round(emmean + 1.96*SE.x, 2), ")", sep = ""),
+    PI = paste0("(", round(prediction - 1.96*SE.y, 2), ", ", round(prediction + 1.96*SE.y, 2), ")", sep = "")
+    ) %>%
+  select(Posture, CI, PI) %>%
+  gt() %>%
+  tab_header(title = "95% Intervals for Lower Back")
+
+# plot(custom_preds, PIs = TRUE) + theme_bw()
 
 model_preds_lb %>%
   ggplot(aes(color = posture)) +
@@ -220,7 +233,7 @@ model_preds_lb %>%
   geom_point(data = model_preds_lb_pi,
              aes(y = posture, x = prediction)) +
   geom_errorbar(data = model_preds_lb_pi,
-                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width =0, size = 3, alpha = .4) +
+                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, size = 3, alpha = .4) +
 
   geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
   
@@ -251,6 +264,7 @@ qqline(residuals(lmer_mb))
 
 ```{r}
 #| warning: false
+#| echo: false
 custom_combos <- data.frame(
   posture = model_data$posture %>% unique()
 )
@@ -274,7 +288,18 @@ model_preds_mb_pi <- predict(custom_preds,
                          ) %>% 
   as_tibble()
 
-plot(custom_preds, PIs = TRUE) + theme_bw()
+model_preds_mb %>%
+  left_join(model_preds_mb_pi, by = "posture") %>%
+  mutate(
+    Posture = posture,
+    CI = paste0("(", round(emmean - 1.96*SE.x, 2), ", ", round(emmean + 1.96*SE.x, 2), ")", sep = ""),
+    PI = paste0("(", round(prediction - 1.96*SE.y, 2), ", ", round(prediction + 1.96*SE.y, 2), ")", sep = "")
+    ) %>%
+  select(Posture, CI, PI) %>%
+  gt() %>%
+  tab_header(title = "95% Intervals for Mid Back")
+
+# plot(custom_preds, PIs = TRUE) + theme_bw()
 
 model_preds_mb %>%
   ggplot(aes(color = posture)) +
@@ -282,13 +307,13 @@ model_preds_mb %>%
   # confidence interval
   geom_point(aes(y = posture, x = emmean), size = 3) +
   # geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
-  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0, size = 2) +
 
   # prediction interval
   geom_point(data = model_preds_mb_pi,
              aes(y = posture, x = prediction)) +
   geom_errorbar(data = model_preds_mb_pi,
-                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, size = 2, alpha = .4) +
+                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, size = 3, alpha = .4) +
 
   geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
   
@@ -318,7 +343,7 @@ qqline(residuals(lmer_n))
 ```
 
 ```{r}
-
+#| echo: false
 #| warning: false
 custom_combos <- data.frame(
   posture = model_data$posture %>% unique()
@@ -343,7 +368,19 @@ model_preds_n_pi <- predict(custom_preds,
                          ) %>% 
   as_tibble()
 
-plot(custom_preds, PIs = TRUE) + theme_bw()
+
+model_preds_n %>%
+  left_join(model_preds_n_pi, by = "posture") %>%
+  mutate(
+    Posture = posture,
+    CI = paste0("(", round(emmean - 1.96*SE.x, 2), ", ", round(emmean + 1.96*SE.x, 2), ")", sep = ""),
+    PI = paste0("(", round(prediction - 1.96*SE.y, 2), ", ", round(prediction + 1.96*SE.y, 2), ")", sep = "")
+    ) %>%
+  select(Posture, CI, PI) %>%
+  gt() %>%
+  tab_header(title = "95% Intervals for Neck")
+
+# plot(custom_preds, PIs = TRUE) + theme_bw()
 
 model_preds_n %>%
   ggplot(aes(color = posture)) +
@@ -351,13 +388,13 @@ model_preds_n %>%
   # confidence interval
   geom_point(aes(y = posture, x = emmean), size = 3) +
   # geom_errorbar(aes(y = posture, xmin = asymp.LCL, xmax = asymp.UCL)) +
-  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0) +
+  geom_errorbar(aes(y = posture, xmin = lower.CL, xmax = upper.CL), width = 0, size = 2) +
 
   # prediction interval
   geom_point(data = model_preds_n_pi,
              aes(y = posture, x = prediction)) +
   geom_errorbar(data = model_preds_n_pi,
-                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, size = 2, alpha = .4) +
+                aes(y = posture, xmin = lower.PL, xmax = upper.PL), width = 0, size = 3, alpha = .4) +
 
   geom_vline(aes(xintercept = xint), lty = 2, color = "red", data = data.frame(xint = 0)) +
   
@@ -376,8 +413,7 @@ model_preds_n %>%
         plot.title.position = "plot")
 ```
 
-
-
+## Model Results on 15 Minutes Section
 
 ```{r}
 plot_classifications <- function(df, PI, loc, p) {
@@ -636,9 +672,9 @@ plot_classifications(free_norm, model_preds_n_pi, "neck", 3)
 plot_classifications_advanced(free_norm, model_preds_n_pi, "neck", 3)
 ```
 
-### Ridge Plots
+## Ridge Plots
 
-#### All Devices
+### All Devices
 
 ```{r}
 #| message: false
@@ -669,7 +705,7 @@ free_norm %>%
     xlim(-50, 70)
 ```
 
-#### Lower Back
+### Lower Back
 
 ```{r}
 #| message: false
@@ -694,7 +730,7 @@ free_norm %>%
     xlim(-50, 70)
 ```
 
-#### Mid Back
+### Mid Back
 
 ```{r}
 #| message: false
@@ -719,7 +755,7 @@ free_norm %>%
     xlim(-50, 70)
 ```
 
-#### Neck
+### Neck
 
 ```{r}
 #| message: false
