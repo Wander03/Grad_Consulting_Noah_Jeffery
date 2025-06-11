@@ -382,7 +382,7 @@ model_preds_n %>%
 
 # plot(custom_preds, PIs = TRUE) + theme_bw()
 
-# model_preds_n %>%
+model_preds_n %>%
   ggplot(aes(color = posture)) +
 
   # confidence interval
@@ -681,7 +681,6 @@ plot_classifications_advanced(free_norm, model_preds_n_pi, "neck", 3)
 #| warning: false
 free_norm %>%
   ggplot(aes(x = angle_x, y = device_location, fill = device_location)) +
-  facet_wrap(vars(participant)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
     scale_fill_viridis(
       option = "D", 
@@ -693,10 +692,10 @@ free_norm %>%
         )
       ) +
     labs(
-      title = 'Distribution of Time Spent in Normalized Angle X by Participant',
+      title = 'Distribution of Time Spent in Normalized Angle X by Device',
       fill = 'Device Type',
       x = 'Angle X',
-      y = 'Participant'
+      y = 'Device'
       ) +
     theme_ipsum() +
       theme(
@@ -707,6 +706,32 @@ free_norm %>%
 
 free_norm %>%
   ggplot(aes(x = angle_x, y = device_location, fill = device_location)) +
+    facet_wrap(vars(participant)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
+    scale_fill_viridis(
+      option = "D", 
+      discrete = TRUE,
+      labels = c(
+        "lower_back" = "Lower Back",
+        "mid_back" = "Mid Back",
+        "neck" = "Neck"
+        )
+      ) +
+    labs(
+      title = 'Distribution of Time Spent in Normalized Angle X by Device by Participant',
+      fill = 'Device Type',
+      x = 'Angle X',
+      y = 'Device'
+      ) +
+    theme_ipsum() +
+      theme(
+        panel.spacing = unit(0.1, "lines"),
+        strip.text.x = element_text(size = 8)
+      ) +
+    xlim(-50, 70)
+
+free_norm %>%
+  ggplot(aes(x = angle_x, y = participant, fill = device_location)) +
     geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
     scale_fill_viridis(
       option = "D", 
@@ -721,7 +746,7 @@ free_norm %>%
       title = 'Distribution of Time Spent in Normalized Angle X by Participant',
       fill = 'Device Type',
       x = 'Angle X',
-      y = 'Participant'
+      y = 'Device'
       ) +
     theme_ipsum() +
       theme(
